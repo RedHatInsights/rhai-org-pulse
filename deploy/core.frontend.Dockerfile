@@ -5,7 +5,7 @@
 # core.frontend-builder.Dockerfile + core.frontend-runtime.Dockerfile instead.
 
 # Stage 1: Build the Vue SPA
-FROM registry.access.redhat.com/ubi9/nodejs-20-minimal AS build
+FROM registry.access.redhat.com/ubi9/nodejs-20-minimal@sha256:87f2eb0ce06e922a7629fa94fad62ed4e6be05931852b779269e0692282a099e AS build
 
 USER 0
 
@@ -25,7 +25,7 @@ COPY modules/team-tracker/ ./modules/team-tracker/
 RUN npm run build
 
 # Stage 2: Serve with Red Hat Hardened nginx (distroless)
-FROM registry.access.redhat.com/hi/nginx:latest
+FROM registry.access.redhat.com/hi/nginx@sha256:e176a40c88b70de84fa89c2915ab321b5761c29b188636f4111a4e3fa72714a4
 
 COPY deploy/nginx-default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
