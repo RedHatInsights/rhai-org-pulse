@@ -270,7 +270,8 @@ import {
   History,
   Hospital,
   LayoutDashboard,
-  Rocket
+  Rocket,
+  UserCircle
 } from 'lucide-vue-next'
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
@@ -320,6 +321,7 @@ const ICON_MAP = {
   'hospital': Hospital,
   LayoutDashboard,
   Rocket,
+  UserCircle,
   'rocket': Rocket
 }
 
@@ -328,6 +330,7 @@ const props = defineProps({
   mobileOpen: Boolean,
   activeModule: String,
   activeViewId: String,
+  routeParams: { type: Object, default: () => ({}) },
   user: Object,
   isAdmin: Boolean,
   isTeamAdmin: { type: Boolean, default: false },
@@ -470,7 +473,10 @@ function isNavItemActive(item, section) {
     // Check if the active view is a hidden route mapped to this nav item
     const manifest = props.builtInManifests.find(m => m.slug === slug)
     const hiddenRoutes = manifest?.client?.hiddenRoutes || {}
-    if (hiddenRoutes[props.activeViewId] === viewId) return true
+    const hiddenTarget = hiddenRoutes[props.activeViewId]
+    if (hiddenTarget === viewId) return true
+    // Support "$param" references — resolve from route params
+    if (hiddenTarget?.startsWith('$') && props.routeParams[hiddenTarget.slice(1)] === viewId) return true
     // Mark dashboard-like views as active for the default nav item
     const defaultItem = manifest?.client?.navItems?.find(n => n.default)
     if (defaultItem && viewId === defaultItem.id) {
