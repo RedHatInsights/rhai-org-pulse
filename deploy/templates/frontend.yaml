@@ -139,7 +139,7 @@ objects:
   - apiVersion: v1
     kind: Service
     metadata:
-      name: team-tracker
+      name: org-pulse-frontend
       annotations:
         service.beta.openshift.io/serving-cert-secret-name: frontend-proxy-tls
     spec:
@@ -149,6 +149,6 @@ objects:
       ports:
         - port: 4180
           targetPort: 4180
-          name: proxy
+          name: oauth-proxy
           protocol: TCP
 
