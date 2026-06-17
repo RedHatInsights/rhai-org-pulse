@@ -13,6 +13,7 @@ const registerExecutionRoutes = require('./execution/routes');
 const registerFeatureTrackingRoutes = require('./execution/feature-tracking-routes');
 const registerDeliveryRoutes = require('./delivery/routes');
 const registerHygieneRoutes = require('./hygiene/routes');
+const registerTvFvDeltaRoutes = require('./tv-fv-delta/routes');
 const { getAuditLog } = require('./planning/audit-log');
 
 /**
@@ -109,7 +110,33 @@ function migrateStoragePaths(storage) {
 }
 
 module.exports = function registerRoutes(router, context) {
-  const { storage, requireAuth, requireAdmin, requireReleaseManager, requireScope, roleStore } = context;
+  const { storage, requireAuth, requireAdmin, requireRole, requireScope, roleStore, secrets } = context;
+  const requireReleaseManager = requireRole('release-manager');
+
+  // Create shared clients from context.secrets
+  const { createJiraClient } = require('../../../shared/server/jira');
+  const jira = createJiraClient({
+    email: (secrets && secrets.JIRA_EMAIL) || '',
+    token: (secrets && secrets.JIRA_TOKEN) || '',
+    host: process.env.JIRA_HOST
+  });
+  const { createSmartsheetClient } = require('../../../shared/server/smartsheet');
+  const smartsheet = createSmartsheetClient({
+    apiToken: secrets && secrets.SMARTSHEET_API_TOKEN,
+    sheetId: process.env.SMARTSHEET_SHEET_ID
+  });
+
+  // Register release-manager role
+  context.registerRole('release-manager', {
+    label: 'Release Manager',
+    description: 'Manage release planning, execution, and delivery'
+  });
+
+  // Register module scopes
+  context.registerScopes([
+    { key: 'releases:read', label: 'Releases (Read)', description: 'Read release planning, execution, and delivery data', category: 'Releases' },
+    { key: 'releases:write', label: 'Releases (Write)', description: 'Mutate release planning, execution, and delivery data', category: 'Releases' }
+  ]);
 
   // Run storage path migration on module startup (skip if already done)
   const migrationMarker = storage.readFromStorage('releases/.migration-complete');
@@ -123,7 +150,7 @@ module.exports = function registerRoutes(router, context) {
   }
 
   // Registry routes (top-level under /api/modules/releases/)
-  registerRegistryRoutes(router, { storage, requireAuth, requireReleaseManager, requireScope });
+  registerRegistryRoutes(router, { storage, requireAuth, requireReleaseManager, requireScope, registerRefresh: context.registerRefresh || null, isRefreshRunning: context.isRefreshRunning || null });
 
   // Planning sub-router (mounted at /api/modules/releases/planning/)
   var planningRouter = express.Router();
@@ -134,6 +161,9 @@ module.exports = function registerRoutes(router, context) {
     requireReleaseManager,
     requireScope,
     roleStore,
+    secrets,
+    jira,
+    smartsheet,
     registerDiagnostics: context.registerDiagnostics || null
   });
   router.use('/planning', planningRouter);
@@ -145,7 +175,11 @@ module.exports = function registerRoutes(router, context) {
     requireAuth,
     requireAdmin,
     requireScope,
-    registerDiagnostics: context.registerDiagnostics || null
+    secrets,
+    jira,
+    registerDiagnostics: context.registerDiagnostics || null,
+    registerRefresh: context.registerRefresh || null,
+    isRefreshRunning: context.isRefreshRunning || null
   });
   registerFeatureTrackingRoutes(executionRouter, {
     storage,
@@ -162,7 +196,11 @@ module.exports = function registerRoutes(router, context) {
     requireAuth,
     requireAdmin,
     requireScope,
-    registerDiagnostics: context.registerDiagnostics || null
+    secrets,
+    jira,
+    registerDiagnostics: context.registerDiagnostics || null,
+    registerRefresh: context.registerRefresh || null,
+    isRefreshRunning: context.isRefreshRunning || null
   });
   router.use('/delivery', deliveryRouter);
 
@@ -174,9 +212,21 @@ module.exports = function registerRoutes(router, context) {
     requireAdmin,
     requireReleaseManager,
     requireScope,
-    registerDiagnostics: context.registerDiagnostics || null
+    registerDiagnostics: context.registerDiagnostics || null,
+    registerRefresh: context.registerRefresh || null,
+    isRefreshRunning: context.isRefreshRunning || null
   });
   router.use('/hygiene', hygieneRouter);
+
+  // TV/FV Delta sub-router (mounted at /api/modules/releases/tv-fv-delta/)
+  const tvFvDeltaRouter = express.Router();
+  registerTvFvDeltaRoutes(tvFvDeltaRouter, {
+    storage,
+    requireAuth,
+    requireScope,
+    registerDiagnostics: context.registerDiagnostics || null
+  });
+  router.use('/tv-fv-delta', tvFvDeltaRouter);
 
   // ─── Unified Audit Routes ───
 

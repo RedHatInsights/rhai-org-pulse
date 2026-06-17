@@ -5,6 +5,7 @@
  * Storage paths migrated to releases/execution/ (Phase 5).
  */
 
+const scheduler = require('./scheduler');
 const {
   getToken,
   getTokenSource,
@@ -12,10 +13,15 @@ const {
   manualRefresh,
   onConfigSave,
   initScheduler
-} = require('./scheduler');
+} = scheduler;
 const { logAudit } = require('../planning/audit-log');
 
 const DATA_PREFIX = 'releases/execution';
+
+function stripZStream(value) {
+  if (!value) return value
+  return String(value).replace(/\.z\b/gi, '')
+}
 
 /**
  * @openapi
@@ -117,6 +123,9 @@ const DATA_PREFIX = 'releases/execution';
  */
 
 module.exports = function registerExecutionRoutes(router, context) {
+  // Initialize scheduler with secrets
+  if (context.secrets) scheduler.init(context.secrets);
+
   const { storage, requireAuth, requireScope } = context;
 
   function readDataFile(relativePath) {
@@ -149,8 +158,9 @@ module.exports = function registerExecutionRoutes(router, context) {
 
     const versionFilter = req.query.version;
     if (versionFilter) {
+      const normalizedFilter = stripZStream(versionFilter);
       features = features.filter(f =>
-        f.fixVersions && f.fixVersions.includes(versionFilter)
+        f.fixVersions && f.fixVersions.some(v => stripZStream(v) === normalizedFilter)
       );
     }
 
@@ -251,7 +261,7 @@ module.exports = function registerExecutionRoutes(router, context) {
     const versions = new Set();
     for (const f of index.features) {
       for (const v of (f.fixVersions || [])) {
-        versions.add(v);
+        versions.add(stripZStream(v));
       }
     }
 
@@ -260,6 +270,9 @@ module.exports = function registerExecutionRoutes(router, context) {
 
   // POST /refresh — trigger manual data refresh (admin only)
   router.post('/refresh', context.requireAdmin, requireScope('releases:write'), async function(req, res) {
+    if (context.isRefreshRunning && context.isRefreshRunning()) {
+      return res.status(409).json({ status: 'error', message: 'A global refresh is already in progress' });
+    }
     try {
       const result = await manualRefresh(storage);
       if (result.httpStatus === 429) {
@@ -321,6 +334,21 @@ module.exports = function registerExecutionRoutes(router, context) {
         lastFetchStatus: lastFetch?.status || null,
         configured: loadConfig(storage).enabled && !!getToken()
       };
+    });
+  }
+
+  if (context.registerRefresh) {
+    context.registerRefresh('execution', {
+      order: 70,
+      timeout: 600000,
+      handler: async function(options) {
+        options = options || {};
+        if (options.skipCooldown) {
+          const { runFetch } = require('./scheduler');
+          return runFetch(storage);
+        }
+        return manualRefresh(storage);
+      }
     });
   }
 };

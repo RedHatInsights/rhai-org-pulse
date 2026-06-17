@@ -6,6 +6,7 @@
       :mobile-open="mobileMenuOpen"
       :active-module="activeModule"
       :active-view-id="activeViewId"
+      :route-params="routeParams"
       :user="authUser"
       :is-admin="authIsAdmin"
       :is-team-admin="authIsTeamAdmin"
@@ -35,7 +36,7 @@
         </svg>
         <span>
           Viewing as: <strong>{{ impersonatingDisplayName }}</strong> ({{ impersonatingUidValue }})
-          <span v-if="authUser?.permissionTier"> — {{ authUser.permissionTier }} tier</span>
+          <span v-if="authRoles && authRoles.length"> — {{ authRoles.join(', ') }}</span>
         </span>
         <button
           @click="handleStopImpersonating"
@@ -836,17 +837,7 @@ export default {
       this.showRefreshModal = false
       this.isRefreshing = true
       try {
-        const refreshes = [refreshMetrics({ scope: 'all', force, sources })]
-        if (this.enabledBuiltInSlugs?.includes('team-tracker')) {
-          refreshes.push(
-            apiRequest('/modules/team-tracker/allocation/refresh', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ hardRefresh: force })
-            }).catch(err => console.error('Allocation refresh failed:', err))
-          )
-        }
-        await Promise.all(refreshes)
+        await refreshMetrics({ scope: 'all', force, sources })
         this.showToast('Refresh started — data will update shortly')
       } catch (err) {
         console.error('Failed to start refresh:', err)

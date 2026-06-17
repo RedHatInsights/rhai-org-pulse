@@ -15,12 +15,6 @@ parameters:
     value: quay.io/openshift/origin-oauth-proxy:4.16
   - name: FRONTEND_REPLICAS
     value: "1"
-  - name: ROUTE_HOST
-    value: ""
-  - name: ROUTE_SHARD_LABEL
-    value: ""
-  - name: ROUTE_APPCODE_LABEL
-    value: HPOP-0001
   - name: NGINX_MEMORY_REQUEST
     value: 32Mi
   - name: NGINX_MEMORY_LIMIT
@@ -103,8 +97,7 @@ objects:
     kind: ServiceAccount
     metadata:
       name: frontend-proxy
-      annotations:
-        serviceaccounts.openshift.io/oauth-redirectreference.primary: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"team-tracker"}}'
+      annotations: {}
 
   - apiVersion: apps/v1
     kind: Deployment
@@ -162,11 +155,13 @@ objects:
                 - --https-address=:4180
                 - --http-address=
                 - --provider=openshift
-                - --openshift-service-account=frontend-proxy
+                - --client-id=org-pulse-stage
+                - --client-secret-file=/etc/proxy/client-secret/secret
                 - --upstream=http://localhost:8080
                 - --tls-cert=/etc/tls/private/tls.crt
                 - --tls-key=/etc/tls/private/tls.key
                 - --cookie-secret-file=/etc/proxy/cookie-secret/session_secret
+                - --scope=user:full
                 - --pass-user-headers=true
                 - --email-domain=*
                 - --skip-auth-regex=^/api/docs
@@ -176,6 +171,9 @@ objects:
                   readOnly: true
                 - name: cookie-secret
                   mountPath: /etc/proxy/cookie-secret
+                  readOnly: true
+                - name: client-secret
+                  mountPath: /etc/proxy/client-secret
                   readOnly: true
               resources:
                 requests:
@@ -224,11 +222,14 @@ objects:
                 name: nginx-config-template
             - name: rendered-config
               emptyDir: {}
+            - name: client-secret
+              secret:
+                secretName: proxy-auth-secret
 
   - apiVersion: v1
     kind: Service
     metadata:
-      name: team-tracker
+      name: org-pulse-frontend
       annotations:
         service.beta.openshift.io/serving-cert-secret-name: frontend-proxy-tls
     spec:
@@ -238,22 +239,6 @@ objects:
       ports:
         - port: 4180
           targetPort: 4180
-          name: proxy
+          name: oauth-proxy
           protocol: TCP
 
-  - apiVersion: route.openshift.io/v1
-    kind: Route
-    metadata:
-      name: team-tracker
-      labels:
-        shard: ${ROUTE_SHARD_LABEL}
-        paas.redhat.com/appcode: ${ROUTE_APPCODE_LABEL}
-    spec:
-      host: ${ROUTE_HOST}
-      to:
-        kind: Service
-        name: team-tracker
-      port:
-        targetPort: proxy
-      tls:
-        termination: reencrypt

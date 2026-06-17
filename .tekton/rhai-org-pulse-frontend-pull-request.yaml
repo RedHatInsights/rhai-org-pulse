@@ -27,7 +27,7 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: deploy/frontend.Dockerfile
+    value: deploy/core.frontend.Dockerfile
   - name: path-context
     value: .
   pipelineSpec:

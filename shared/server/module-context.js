@@ -12,9 +12,12 @@
  * @property {Function} requireAuth    - Express middleware — requires authenticated user
  * @property {Function} requireAdmin   - Express middleware — requires admin role
  * @property {Function} requireTeamAdmin - Express middleware — requires team-admin or admin role
- * @property {Function} requireReleaseManager - Express middleware — requires release-manager role
+ * @property {Function} requireRole    - Factory: requireRole(role) returns Express middleware
  * @property {Function} requireScope   - Factory returning Express middleware for API token scope check
  * @property {object} roleStore        - Role store instance (getRole, setRole, etc.)
+ * @property {object} [roleRegistry]   - Role registry for registerRole
+ * @property {object} [scopeRegistry]  - Scope registry for registerScopes
+ * @property {object} [secretRegistry] - Secret registry for module secrets
  */
 
 /**
@@ -24,6 +27,7 @@
  * @property {Function} handler - Async function to execute the refresh
  * @property {Function} [status] - Async function returning current status
  * @property {number} [order=100] - Execution order (lower runs first)
+ * @property {number} [timeout] - Per-handler timeout in ms (overrides global runAll timeout)
  */
 
 /**
@@ -34,13 +38,19 @@
  * @property {Function} requireAuth    - Express middleware — requires authenticated user
  * @property {Function} requireAdmin   - Express middleware — requires admin role
  * @property {Function} requireTeamAdmin - Express middleware — requires team-admin or admin role
- * @property {Function} requireReleaseManager - Express middleware — requires release-manager role
+ * @property {Function} requireRole    - Factory: requireRole(role) returns Express middleware
  * @property {Function} requireScope   - Factory returning Express middleware for API token scope check
  * @property {object} roleStore        - Role store instance
  * @property {Function} registerDiagnostics - Register a diagnostics function for admin health checks
  * @property {Function} registerMessageProvider - Register a message provider (id, fn)
  * @property {Function} registerRefresh - Register a refresh handler (id, config)
  * @property {Function} registerExport - Register a data export hook (fn)
+ * @property {Function} registerRole - Register a module role (id, config)
+ * @property {Function} registerScopes - Register module scopes (configs[])
+ * @property {Function} isRefreshRunning - Check if a global refresh-all is in progress
+ * @property {object} secrets - Frozen object of resolved secret values for this module
+ * @property {Function} resolveSecret - Dynamic secret lookup: resolveSecret(envVarName) => string|undefined. Warning: v1 does not enforce module isolation — any module can resolve any env var. Logs a warning for undeclared access.
+ * @property {Function} registerSecretValidator - Register an async validator for a secret key
  */
 
 /**
@@ -63,15 +73,32 @@
  */
 function buildModuleContext(coreServices, slug, registries = {}) {
   const { diagnostics, messages, refresh, exports: exportRegistry } = registries
+  const roleRegistry = coreServices.roleRegistry || null
+  const scopeRegistry = coreServices.scopeRegistry || null
+  const secretRegistry = coreServices.secretRegistry || null
 
   const ctx = {
     storage: coreServices.storage,
     requireAuth: coreServices.requireAuth,
     requireAdmin: coreServices.requireAdmin,
     requireTeamAdmin: coreServices.requireTeamAdmin,
-    requireReleaseManager: coreServices.requireReleaseManager,
+    requireRole: coreServices.requireRole,
     requireScope: coreServices.requireScope,
     roleStore: coreServices.roleStore,
+
+    registerRole: roleRegistry
+      ? function (id, config) {
+        roleRegistry.register(id, { ...config, module: slug })
+      }
+      : function () {},
+
+    registerScopes: scopeRegistry
+      ? function (scopeConfigs) {
+        for (const config of scopeConfigs) {
+          scopeRegistry.register(config.key, { ...config, module: slug })
+        }
+      }
+      : function () {},
 
     registerDiagnostics: diagnostics
       ? function (fn) {
@@ -90,6 +117,27 @@ function buildModuleContext(coreServices, slug, registries = {}) {
 
     registerExport: exportRegistry
       ? function (fn) { exportRegistry.register(slug, fn) }
+      : function () {},
+
+    isRefreshRunning: refresh
+      ? function () { return refresh.isRunning() }
+      : function () { return false },
+
+    secrets: secretRegistry
+      ? secretRegistry.getModuleSecrets(slug)
+      : Object.freeze({}),
+
+    /**
+     * Dynamic secret lookup. Reads process.env at call time.
+     * Logs a warning if the key is outside this module's declarations (v1 limitation:
+     * does not block access, only warns — Phase 2 will add pattern-based enforcement).
+     */
+    resolveSecret: secretRegistry
+      ? function (envVarName) { return secretRegistry.resolveSecret(envVarName, slug) }
+      : function () { return undefined },
+
+    registerSecretValidator: secretRegistry
+      ? function (key, fn) { secretRegistry.registerValidator(key, fn) }
       : function () {}
   }
 
@@ -116,7 +164,7 @@ function createTestContext(overrides = {}) {
     requireAuth: noopMiddleware,
     requireAdmin: noopMiddleware,
     requireTeamAdmin: noopMiddleware,
-    requireReleaseManager: noopMiddleware,
+    requireRole: function () { return noopMiddleware },
     requireScope: function () { return noopMiddleware },
     roleStore: {
       getRole: function () { return null },
@@ -127,7 +175,13 @@ function createTestContext(overrides = {}) {
     registerDiagnostics: noop,
     registerMessageProvider: noop,
     registerRefresh: noop,
-    registerExport: noop
+    registerExport: noop,
+    registerRole: noop,
+    registerScopes: noop,
+    isRefreshRunning: function () { return false },
+    secrets: {},
+    resolveSecret: function () { return undefined },
+    registerSecretValidator: noop
   }
 
   return { ...defaults, ...overrides }

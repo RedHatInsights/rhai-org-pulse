@@ -21,12 +21,6 @@ parameters:
     value: ""
   - name: AUTH_EMAIL_DOMAIN
     value: ""
-  - name: API_ROUTE_HOST
-    value: ""
-  - name: ROUTE_SHARD_LABEL
-    value: ""
-  - name: ROUTE_APPCODE_LABEL
-    value: HPOP-0001
   - name: PVC_STORAGE_SIZE
     value: 1Gi
   - name: BACKEND_MEMORY_REQUEST
@@ -176,26 +170,6 @@ objects:
         - port: 3001
           targetPort: 3001
           protocol: TCP
-
-  - apiVersion: route.openshift.io/v1
-    kind: Route
-    metadata:
-      name: team-tracker-api
-      annotations:
-        haproxy.router.openshift.io/timeout: 120s
-      labels:
-        shard: ${ROUTE_SHARD_LABEL}
-        paas.redhat.com/appcode: ${ROUTE_APPCODE_LABEL}
-    spec:
-      host: ${API_ROUTE_HOST}
-      to:
-        kind: Service
-        name: backend
-      port:
-        targetPort: 3001
-      tls:
-        termination: edge
-        insecureEdgeTerminationPolicy: Redirect
 
   - apiVersion: batch/v1
     kind: CronJob

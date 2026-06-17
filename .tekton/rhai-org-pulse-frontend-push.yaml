@@ -24,7 +24,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/hcm-eng-prod-tenant/rhai-org-pulse-frontend:{{revision}}
   - name: dockerfile
-    value: deploy/frontend.Dockerfile
+    value: deploy/core.frontend.Dockerfile
   - name: path-context
     value: .
   pipelineSpec:
