@@ -25,7 +25,7 @@ COPY modules/team-tracker/ ./modules/team-tracker/
 RUN npm run build
 
 # Stage 2: Serve with Red Hat Hardened nginx (distroless)
-FROM registry.access.redhat.com/hi/nginx@sha256:e176a40c88b70de84fa89c2915ab321b5761c29b188636f4111a4e3fa72714a4
+FROM registry.access.redhat.com/hi/nginx@sha256:e2be644f0e3a9f2cb68104aa6bc5690f04382a746ec01ee379e0eaaf81a8098b
 
 COPY deploy/nginx-default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
