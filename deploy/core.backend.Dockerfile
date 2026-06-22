@@ -34,7 +34,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # Stage 2: Red Hat Hardened Node.js runtime (distroless-like, minimal CVE surface)
-FROM registry.access.redhat.com/hi/nodejs:22.22.3@sha256:8ea4b0361fe1136c2d2080dabee29c8d0f1246ef4ff9c37e89750a5a565baba5 AS core
+FROM registry.access.redhat.com/hi/nodejs:22.22.3@sha256:ed1264d8af55badf4c5df813372846905ffca48c12b620cb8b9c6407a5da869d AS core
 
 USER 0
 
