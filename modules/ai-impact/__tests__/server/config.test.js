@@ -11,7 +11,7 @@ describe('getConfig', () => {
     const readFromStorage = vi.fn().mockReturnValue({ jiraProject: 'CUSTOM' });
     const config = getConfig(readFromStorage);
     expect(config.jiraProject).toBe('CUSTOM');
-    expect(config.linkedProject).toBe('RHAISTRAT'); // default
+    expect(config.linkedProject).toBe('HPSTRAT'); // default
   });
 });
 
@@ -21,7 +21,7 @@ describe('saveConfig', () => {
     saveConfig(writeToStorage, { jiraProject: 'MYPROJECT' });
     expect(writeToStorage).toHaveBeenCalledWith('ai-impact/config.json', expect.objectContaining({
       jiraProject: 'MYPROJECT',
-      linkedProject: 'RHAISTRAT'
+      linkedProject: 'HPSTRAT'
     }));
   });
 

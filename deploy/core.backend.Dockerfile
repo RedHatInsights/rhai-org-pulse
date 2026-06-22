@@ -9,13 +9,21 @@
 # Modules are auto-discovered at startup via filesystem scan.
 
 # Stage 1: Install system deps and node_modules
-FROM registry.access.redhat.com/ubi9/nodejs-22-minimal@sha256:75a2c4753c2475d715e31304ec1effef61770713e6e9fdafdcb80351dbdf3ba5 AS build
+FROM registry.access.redhat.com/ubi9/nodejs-22-minimal:9.8-1781566494@sha256:1d4e4dafffb3b6c969bf585d21ca5316dd2906bedbbfeab6f90ce95c8f54e266 AS build
 
 USER 0
 
 WORKDIR /app
 
 RUN microdnf install -y git-core ca-certificates python3 make gcc gcc-c++ && microdnf clean all
+
+# Collect shared libraries needed by git-remote-https (for HTTPS clone/fetch)
+# The runtime image is distroless-like and lacks libcurl + transitive deps
+RUN mkdir -p /git-libs && \
+  ldd /usr/libexec/git-core/git-remote-https | \
+  awk '/=>/ { print $3 }' | \
+  grep -v -E '/(libc|libpthread|libdl|libm|librt|libresolv|libnss|libgcc_s|libstdc\+\+)\.' | \
+  xargs -I{} cp -L {} /git-libs/
 
 # Trust internal CA
 COPY deploy/certs/internal-root-ca.pem /etc/pki/ca-trust/source/anchors/internal-root-ca.pem
@@ -26,19 +34,27 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # Stage 2: Red Hat Hardened Node.js runtime (distroless-like, minimal CVE surface)
-FROM registry.access.redhat.com/hi/nodejs@sha256:134a8274958fe2ef1d91fce8bdcf7f202eb7d9e125cba5b76b004db278333ab4
+FROM registry.access.redhat.com/hi/nodejs:22.22.3@sha256:8ea4b0361fe1136c2d2080dabee29c8d0f1246ef4ff9c37e89750a5a565baba5 AS core
 
 USER 0
 
 WORKDIR /app
 
-# Copy git binary and libexec helpers from build stage
+# Copy git, tar, and gzip binaries from build stage
 COPY --from=build /usr/bin/git /usr/bin/git
 COPY --from=build /usr/libexec/git-core /usr/libexec/git-core
+COPY --from=build /usr/bin/tar /usr/bin/tar
+COPY --from=build /usr/bin/gzip /usr/bin/gzip
+
+# Copy shared libraries required by git-remote-https (collected via ldd in build stage)
+COPY --from=build /git-libs/ /usr/lib64/
 
 # Copy CA trust bundle (internal CA baked in via update-ca-trust)
 COPY --from=build /etc/pki/ca-trust/extracted /etc/pki/ca-trust/extracted
 COPY --from=build /etc/pki/ca-trust/source/anchors/internal-root-ca.pem /etc/pki/ca-trust/source/anchors/internal-root-ca.pem
+# Symlink ca-bundle.crt where libcurl/git expect it (the target was copied above)
+RUN mkdir -p /etc/pki/tls/certs && \
+  ln -s /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/tls/certs/ca-bundle.crt
 ENV NODE_EXTRA_CA_CERTS=/etc/pki/ca-trust/source/anchors/internal-root-ca.pem
 
 # Copy node_modules from build stage
@@ -79,3 +95,17 @@ ENV NODE_ENV=production
 ENV API_PORT=3001
 
 CMD ["node", "server/dev-server.js"]
+
+# Stage 3: Add customization to the core base image
+
+FROM core
+
+# Add additional modules
+COPY modules/ai-impact/ ./modules/ai-impact/
+
+# Add fixtures (for demo mode)
+COPY fixtures/ai-impact/ ./fixtures/ai-impact/
+
+USER 0
+
+USER 65532
