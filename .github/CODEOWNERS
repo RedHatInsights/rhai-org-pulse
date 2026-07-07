@@ -19,6 +19,7 @@
 /modules/ai-impact/             @accorvin
 /modules/org-roster/            @accorvin
 /modules/releases/              @saprabhu05
+/modules/jira-solve-agent/      @enxebre
 # /modules/search/              @search-team-lead
 # /modules/dashboards/          @dashboards-team-lead
 
