@@ -31,6 +31,8 @@ parameters:
     value: 100m
   - name: OAUTH_PROXY_CPU_LIMIT
     value: 200m
+  - name: OAUTH_CLIENT_ID
+    value: org-pulse-stage
   - name: INIT_CONTAINER_IMAGE
     value: registry.access.redhat.com/ubi9/ubi-minimal:latest
 objects:
@@ -155,7 +157,7 @@ objects:
                 - --https-address=:4180
                 - --http-address=
                 - --provider=openshift
-                - --client-id=org-pulse-stage
+                - --client-id=${OAUTH_CLIENT_ID}
                 - --client-secret-file=/etc/proxy/client-secret/secret
                 - --upstream=http://localhost:8080
                 - --tls-cert=/etc/tls/private/tls.crt
