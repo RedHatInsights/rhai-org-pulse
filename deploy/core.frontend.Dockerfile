@@ -31,7 +31,7 @@ COPY modules/ai-impact/ ./modules/ai-impact/
 RUN npm run build
 
 # Stage 3: Serve with Red Hat Hardened nginx (distroless)
-FROM registry.access.redhat.com/hi/nginx:1.30.2@sha256:8224a88f9347d50a50eb99a9b0009f986b31cc203fa313288ce9f1ee59a9144d
+FROM registry.access.redhat.com/hi/nginx:1.30.4@sha256:5ae117987da6487dbe266d0a48716b1ddb82f86857c3fec5af63c9244c3775b3
 
 COPY deploy/nginx-default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
