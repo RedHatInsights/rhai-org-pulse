@@ -1,24 +1,23 @@
 const { fetchAllJqlResults } = require('../../../../shared/server/jira');
 
-const PROJECTS = ['OCPBUGS', 'CNTRLPLANE'];
+const PROJECTS = ['OCPBUGS', 'CNTRLPLANE', 'TRT'];
 const AGENT_LABEL = 'issue-for-agent';
 const PROCESSED_LABEL = 'agent-processed';
 const READY_TO_SOLVE_LABEL = 'ready-to-solve';
 
 const FIELDS = 'summary,status,issuetype,priority,created,updated,labels,components,assignee';
 
-function classifyIssue(statusName, labels) {
-  const name = (statusName || '').toLowerCase();
+function classifyIssue(statusCategory, labels) {
+  const category = (statusCategory || '').toLowerCase();
   const labelSet = new Set(labels);
 
-  if (name === 'closed' || name === 'resolved' || name === 'done' || name === 'verified') {
+  if (category === 'done') {
     return 'closed';
   }
-  if (name === 'in progress' || name === 'code review' || name === 'review' ||
-      name === 'on_qa' || name === 'on qa' || name === 'modified') {
+  if (category === 'in progress') {
     return 'in-progress';
   }
-  if (name === 'new' || name === 'open' || name === 'to do' || name === 'backlog') {
+  if (category === 'to do' || category === 'new') {
     if (labelSet.has(READY_TO_SOLVE_LABEL)) return 'ready-to-solve';
     return 'new';
   }
@@ -28,6 +27,7 @@ function classifyIssue(statusName, labels) {
 function processIssue(issue) {
   const labels = issue.fields.labels || [];
   const statusName = issue.fields.status?.name || 'Unknown';
+  const statusCategory = issue.fields.status?.statusCategory?.name || '';
   const components = (issue.fields.components || []).map(c => c.name);
 
   return {
@@ -41,7 +41,7 @@ function processIssue(issue) {
     labels,
     components,
     assignee: issue.fields.assignee?.displayName || null,
-    agentState: classifyIssue(statusName, labels),
+    agentState: classifyIssue(statusCategory, labels),
     processed: labels.includes(PROCESSED_LABEL)
   };
 }

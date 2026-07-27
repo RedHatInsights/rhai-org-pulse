@@ -1,7 +1,7 @@
 <template>
   <div>
-    <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1 px-6 pt-6">Jira Solve Agent</h2>
-    <p class="text-sm text-gray-500 dark:text-gray-400 px-6 mb-4">Track the progress and adoption of Jira Solve Agent.</p>
+    <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1 px-6 pt-6">OpenShift Jira Solve Agent</h2>
+    <p class="text-sm text-gray-500 dark:text-gray-400 px-6 mb-4">Track the progress and adoption of OpenShift Jira Solve Agent.</p>
     <AgentContent
       :agent-data="data"
       :loading="loading"

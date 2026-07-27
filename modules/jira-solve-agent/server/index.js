@@ -7,8 +7,8 @@ module.exports = function registerRoutes(router, context) {
   const { readFromStorage, writeToStorage } = storage;
 
   context.registerScopes([
-    { key: 'jira-solve-agent:read', label: 'Jira Solve Agent (Read)', description: 'Read agent data', category: 'Jira Solve Agent' },
-    { key: 'jira-solve-agent:write', label: 'Jira Solve Agent (Write)', description: 'Refresh agent data', category: 'Jira Solve Agent' }
+    { key: 'jira-solve-agent:read', label: 'OpenShift Jira Solve Agent (Read)', description: 'Read agent data', category: 'OpenShift Jira Solve Agent' },
+    { key: 'jira-solve-agent:write', label: 'OpenShift Jira Solve Agent (Write)', description: 'Refresh agent data', category: 'OpenShift Jira Solve Agent' }
   ]);
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
@@ -27,8 +27,8 @@ module.exports = function registerRoutes(router, context) {
    * @openapi
    * /api/modules/jira-solve-agent/data:
    *   get:
-   *     tags: [Jira Solve Agent]
-   *     summary: Get cached agent issue data with computed metrics
+   *     tags: [OpenShift Jira Solve Agent]
+   *     summary: Get cached OpenShift Jira Solve Agent data with computed metrics
    *     responses:
    *       200:
    *         description: Agent data with metrics and issues
@@ -60,8 +60,8 @@ module.exports = function registerRoutes(router, context) {
    * @openapi
    * /api/modules/jira-solve-agent/refresh:
    *   post:
-   *     tags: [Jira Solve Agent]
-   *     summary: Fetch fresh data from Jira and update cache
+   *     tags: [OpenShift Jira Solve Agent]
+   *     summary: Fetch fresh OpenShift Jira Solve Agent data from Jira and update cache
    *     responses:
    *       200:
    *         description: Refresh completed

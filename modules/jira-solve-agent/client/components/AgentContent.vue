@@ -15,32 +15,65 @@
     </div>
 
     <template v-else>
+      <!-- Team selector with inline stats -->
+      <div class="px-6 pt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <button
+          v-for="team in teamOptions"
+          :key="team.key"
+          :class="[
+            'px-4 py-4 rounded-lg border transition-colors text-left',
+            selectedTeam === team.key
+              ? 'bg-primary-600 text-white border-primary-600 shadow-md'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+          ]"
+          @click="selectedTeam = team.key"
+        >
+          <div class="text-sm font-semibold mb-2">{{ team.label }}</div>
+          <div class="flex items-center gap-3">
+            <div class="text-center">
+              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-gray-900 dark:text-gray-100']">{{ teamStats(team.key).total }}</div>
+              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total</div>
+            </div>
+            <div :class="['w-px h-8', selectedTeam === team.key ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700']"></div>
+            <div class="text-center">
+              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-amber-600 dark:text-amber-400']">{{ teamStats(team.key).inProgress }}</div>
+              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">wip</div>
+            </div>
+            <div :class="['w-px h-8', selectedTeam === team.key ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700']"></div>
+            <div class="text-center">
+              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-gray-500 dark:text-gray-400']">{{ teamStats(team.key).closed }}</div>
+              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">closed</div>
+            </div>
+          </div>
+        </button>
+      </div>
+
       <!-- Stat cards -->
       <div class="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ metrics.totalIssues }}</div>
+          <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ displayMetrics.totalIssues }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Total Issues</div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ metrics.byState.new || 0 }}</div>
+          <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ displayMetrics.byState.new || 0 }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">New</div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ metrics.byState['ready-to-solve'] || 0 }}</div>
+          <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ displayMetrics.byState['ready-to-solve'] || 0 }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Ready to Solve</div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-amber-600 dark:text-amber-400">{{ metrics.byState['in-progress'] || 0 }}</div>
+          <div class="text-2xl font-bold text-amber-600 dark:text-amber-400">{{ displayMetrics.byState['in-progress'] || 0 }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">In Progress</div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-gray-600 dark:text-gray-400">{{ metrics.byState.closed || 0 }}</div>
+          <div class="text-2xl font-bold text-gray-600 dark:text-gray-400">{{ displayMetrics.byState.closed || 0 }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Closed</div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ metrics.processedRate }}%</div>
+          <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ displayMetrics.processedRate }}%</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Processed</div>
-          <div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ metrics.processedCount }}/{{ metrics.totalIssues }}</div>
+          <div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ displayMetrics.processedCount }}/{{ displayMetrics.totalIssues }}</div>
         </div>
       </div>
 
@@ -89,6 +122,7 @@
                 <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                   <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Key</th>
                   <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Summary</th>
+                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Component</th>
                   <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Status</th>
                   <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Agent State</th>
                   <th class="px-4 py-2 text-center text-gray-500 dark:text-gray-400 font-medium">Processed</th>
@@ -99,7 +133,7 @@
               </thead>
               <tbody>
                 <tr v-if="filteredIssues.length === 0">
-                  <td colspan="8" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                  <td colspan="9" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
                     No issues match your filters.
                   </td>
                 </tr>
@@ -120,6 +154,9 @@
                   </td>
                   <td class="px-4 py-2 text-gray-900 dark:text-gray-100 max-w-md truncate">
                     {{ issue.summary }}
+                  </td>
+                  <td class="px-4 py-2 text-gray-600 dark:text-gray-300 text-xs">
+                    {{ issue.components.join(', ') || '—' }}
                   </td>
                   <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
                     {{ issue.status }}
@@ -173,17 +210,73 @@ const props = defineProps({
 
 defineEmits(['retry']);
 
+const TEAMS = [
+  { key: 'hypershift', label: 'HyperShift', components: ['HyperShift', 'Hosted Control Planes'] },
+  { key: 'installer', label: 'Installer', components: ['Installer / openshift-installer'] },
+  { key: 'trt', label: 'TRT', projectPrefix: 'TRT' },
+  { key: 'edge-ecosystem', label: 'Edge & Ecosystem', components: [] },
+];
+
+const selectedTeam = ref('all');
 const searchQuery = ref('');
 const stateFilter = ref('all');
 const processedFilter = ref('all');
 
+const teamOptions = computed(() => [
+  { key: 'all', label: 'All Teams', components: [] },
+  ...TEAMS
+]);
+
 const jiraHost = computed(() => props.agentData?.jiraHost || 'https://redhat.atlassian.net');
-const metrics = computed(() => props.agentData?.metrics || { totalIssues: 0, byState: {}, processedCount: 0, processedRate: 0 });
+
+function filterByTeam(issues, teamKey) {
+  if (teamKey === 'all') return issues;
+  const team = TEAMS.find(t => t.key === teamKey);
+  if (!team) return issues;
+  if (team.projectPrefix) {
+    return issues.filter(i => i.key.startsWith(team.projectPrefix + '-'));
+  }
+  return issues.filter(i => i.components.some(c => team.components.includes(c)));
+}
+
+const teamFilteredIssues = computed(() => {
+  if (!props.agentData?.issues) return [];
+  return filterByTeam(props.agentData.issues, selectedTeam.value);
+});
+
+function teamStats(teamKey) {
+  if (!props.agentData?.issues) return { total: 0, closed: 0, inProgress: 0 };
+  const issues = filterByTeam(props.agentData.issues, teamKey);
+  let closed = 0;
+  let inProgress = 0;
+  for (const i of issues) {
+    if (i.agentState === 'closed') closed++;
+    if (i.agentState === 'in-progress') inProgress++;
+  }
+  return { total: issues.length, closed, inProgress };
+}
+
+function recomputeMetrics(issues) {
+  const byState = { new: 0, 'ready-to-solve': 0, 'in-progress': 0, closed: 0, other: 0 };
+  let processedCount = 0;
+  for (const issue of issues) {
+    byState[issue.agentState] = (byState[issue.agentState] || 0) + 1;
+    if (issue.processed) processedCount++;
+  }
+  const totalIssues = issues.length;
+  const processedRate = totalIssues > 0 ? Math.round((processedCount / totalIssues) * 100) : 0;
+  return { totalIssues, byState, processedCount, processedRate };
+}
+
+const displayMetrics = computed(() => {
+  if (selectedTeam.value === 'all') {
+    return props.agentData?.metrics || { totalIssues: 0, byState: {}, processedCount: 0, processedRate: 0 };
+  }
+  return recomputeMetrics(teamFilteredIssues.value);
+});
 
 const filteredIssues = computed(() => {
-  if (!props.agentData?.issues) return [];
-
-  let issues = props.agentData.issues;
+  let issues = teamFilteredIssues.value;
 
   if (stateFilter.value !== 'all') {
     issues = issues.filter(i => i.agentState === stateFilter.value);

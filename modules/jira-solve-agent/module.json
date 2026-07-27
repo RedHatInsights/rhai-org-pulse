@@ -1,13 +1,13 @@
 {
-  "name": "Jira Solve Agent",
+  "name": "OpenShift Jira Solve Agent",
   "slug": "jira-solve-agent",
-  "description": "Track the progress and adoption of Jira Solve Agent",
+  "description": "Track the progress and adoption of OpenShift Jira Solve Agent",
   "icon": "bot",
   "order": 10,
   "client": {
     "entry": "./client/index.js",
     "navItems": [
-      { "id": "main", "label": "Jira Solve Agent", "icon": "Bot", "default": true }
+      { "id": "main", "label": "OpenShift Jira Solve Agent", "icon": "Bot", "default": true }
     ]
   },
   "server": {
