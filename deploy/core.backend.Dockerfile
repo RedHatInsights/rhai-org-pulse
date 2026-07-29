@@ -102,6 +102,7 @@ FROM core
 
 # Add additional modules
 COPY modules/ai-impact/ ./modules/ai-impact/
+COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
 
 # Add fixtures (for demo mode)
 COPY fixtures/ai-impact/ ./fixtures/ai-impact/

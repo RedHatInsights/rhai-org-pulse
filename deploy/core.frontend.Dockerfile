@@ -27,6 +27,7 @@ FROM core-build AS build
 
 # Add additional modules
 COPY modules/ai-impact/ ./modules/ai-impact/
+COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
 
 RUN npm run build
 
