@@ -4,10 +4,11 @@ const { createTestContext } = require('../../../../shared/server/module-context'
 const registerRoutes = require('../../server/index')
 
 describe('server routes', () => {
-  it('registers GET /hello', () => {
+  it('registers GET /data and POST /refresh', () => {
     const router = { get: vi.fn(), post: vi.fn() }
     const context = createTestContext()
     registerRoutes(router, context)
-    expect(router.get).toHaveBeenCalledWith('/hello', expect.any(Function), expect.any(Function))
+    expect(router.get).toHaveBeenCalledWith('/data', expect.any(Function), expect.any(Function))
+    expect(router.post).toHaveBeenCalledWith('/refresh', expect.any(Function), expect.any(Function), expect.any(Function))
   })
 })
