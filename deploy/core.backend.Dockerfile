@@ -9,7 +9,7 @@
 # Modules are auto-discovered at startup via filesystem scan.
 
 # Stage 1: Install system deps and node_modules
-FROM registry.access.redhat.com/ubi9/nodejs-22-minimal:9.8-1781566494@sha256:1d4e4dafffb3b6c969bf585d21ca5316dd2906bedbbfeab6f90ce95c8f54e266 AS build
+FROM registry.access.redhat.com/ubi9/nodejs-22-minimal:9.8-1785287245@sha256:22478b029a3723d240fb7a7751e0d5e9655c54352e9f9f55206d060786839143 AS build
 
 USER 0
 
@@ -34,7 +34,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # Stage 2: Red Hat Hardened Node.js runtime (distroless-like, minimal CVE surface)
-FROM registry.access.redhat.com/hi/nodejs:22.23.1@sha256:68a2976fae2366c587f68d969dccc98f4506c5f606f6d78e96ac4c7c6cb8005e AS core
+FROM registry.access.redhat.com/hi/nodejs:22.23.1@sha256:2da12654c0a5897d03970743e1a678ca899b29332d5b5ffd7636ed122f51a511 AS core
 
 USER 0
 
@@ -102,6 +102,7 @@ FROM core
 
 # Add additional modules
 COPY modules/ai-impact/ ./modules/ai-impact/
+COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
 
 # Add fixtures (for demo mode)
 COPY fixtures/ai-impact/ ./fixtures/ai-impact/
