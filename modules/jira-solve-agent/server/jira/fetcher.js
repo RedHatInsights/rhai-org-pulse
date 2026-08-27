@@ -4,8 +4,9 @@ const PROJECTS = ['OCPBUGS', 'CNTRLPLANE', 'TRT', 'WINC', 'MCO', 'NE'];
 const AGENT_LABEL = 'issue-for-agent';
 const PROCESSED_LABEL = 'agent-processed';
 const READY_TO_SOLVE_LABEL = 'ready-to-solve';
+const MERGED_RESOLUTIONS = ['Done', 'Done-Errata'];
 
-const FIELDS = 'summary,status,issuetype,priority,created,updated,labels,components,assignee';
+const FIELDS = 'summary,status,resolution,issuetype,priority,created,updated,labels,components,assignee';
 
 function classifyIssue(statusCategory, labels) {
   const category = (statusCategory || '').toLowerCase();
@@ -27,6 +28,7 @@ function classifyIssue(statusCategory, labels) {
 function processIssue(issue) {
   const labels = issue.fields.labels || [];
   const statusName = issue.fields.status?.name || 'Unknown';
+  const resolution = issue.fields.resolution?.name || null;
   const statusCategory = issue.fields.status?.statusCategory?.name || '';
   const components = (issue.fields.components || []).map(c => c.name);
 
@@ -34,6 +36,7 @@ function processIssue(issue) {
     key: issue.key,
     summary: issue.fields.summary,
     status: statusName,
+    resolution,
     issueType: issue.fields.issuetype?.name || 'Unknown',
     priority: issue.fields.priority?.name || 'None',
     created: issue.fields.created,
@@ -42,7 +45,8 @@ function processIssue(issue) {
     components,
     assignee: issue.fields.assignee?.displayName || null,
     agentState: classifyIssue(statusCategory, labels),
-    processed: labels.includes(PROCESSED_LABEL)
+    processed: labels.includes(PROCESSED_LABEL),
+    merged: resolution !== null && MERGED_RESOLUTIONS.includes(resolution)
   };
 }
 
@@ -194,5 +198,6 @@ module.exports = {
   PROJECTS,
   AGENT_LABEL,
   PROCESSED_LABEL,
-  READY_TO_SOLVE_LABEL
+  READY_TO_SOLVE_LABEL,
+  MERGED_RESOLUTIONS
 };

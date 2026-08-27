@@ -1075,6 +1075,23 @@ JSON Lines format (one JSON object per line). Partitioned by month for efficient
 
 ---
 
+## Jira Solve Agent — `data/jira-solve-agent/data.json`
+
+Stores Jira issues selected for the solve agent. Each issue includes its Jira
+labels, status, and resolution plus these derived fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `agentState` | string | UI state derived from the Jira status category |
+| `processed` | boolean | `true` when the issue has the `agent-processed` label |
+| `merged` | boolean | `true` when resolution is `Done` or `Done-Errata` |
+
+The dashboard funnel counts all fetched `issue-for-agent` issues as candidates,
+issues with `processed: true` as attempts, and issues with `merged: true` as
+merges. See `fixtures/jira-solve-agent/data.json` for the complete structure.
+
+---
+
 ## Fixture Rules
 
 The `fixtures/` directory provides read-only demo data used when `DEMO_MODE=true`. These rules prevent data format drift:

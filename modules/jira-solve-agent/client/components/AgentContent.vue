@@ -15,28 +15,43 @@
     </div>
 
     <template v-else>
+      <!-- Primary KPIs -->
+      <div class="px-6 pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <a :href="jiraSearchUrl(selectedTeam, 'attempts')" target="_blank" rel="noopener noreferrer" aria-label="View total attempts in Jira" class="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors shadow-sm">
+          <div class="text-4xl font-bold text-amber-600 dark:text-amber-400">{{ funnelMetrics.attempts }}</div>
+          <div class="text-sm font-semibold text-gray-600 dark:text-gray-300 mt-2 uppercase tracking-wide">Total Attempts</div>
+        </a>
+        <a :href="jiraSearchUrl(selectedTeam, 'merges')" target="_blank" rel="noopener noreferrer" aria-label="View merged candidates for merge rate in Jira" class="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors shadow-sm">
+          <div class="text-4xl font-bold text-purple-600 dark:text-purple-400">{{ funnelMetrics.mergeRate }}%</div>
+          <div class="text-sm font-semibold text-gray-600 dark:text-gray-300 mt-2 uppercase tracking-wide">Merge Rate</div>
+          <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ funnelMetrics.merges }}/{{ funnelMetrics.candidates }} candidates</div>
+        </a>
+      </div>
+
       <!-- Team selector with inline stats -->
-      <div class="px-6 pt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        <button
+      <div class="px-6 pt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div
           v-for="team in teamOptions"
           :key="team.key"
           :class="[
-            'relative group px-4 py-4 rounded-lg border transition-colors text-left',
+            'relative group px-4 py-4 rounded-lg border transition-colors text-left min-w-0',
             selectedTeam === team.key
               ? 'bg-primary-600 text-white border-primary-600 shadow-md'
               : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
           ]"
-          :aria-describedby="reposForTeam(team.key).length ? `repos-${team.key}` : undefined"
-          @click="selectedTeam = team.key"
         >
-          <div class="text-sm font-semibold mb-2">{{ team.label }}</div>
+          <button
+            class="text-sm font-semibold mb-2 hover:underline"
+            :aria-describedby="reposForTeam(team.key).length ? `repos-${team.key}` : undefined"
+            @click="selectedTeam = team.key"
+          >{{ team.label }}</button>
 
           <!-- Repos this team tracks, revealed on hover/focus. -->
           <span
             v-if="reposForTeam(team.key).length"
             :id="`repos-${team.key}`"
             role="tooltip"
-            class="pointer-events-none absolute left-0 top-full z-20 mt-1 w-max max-w-xs rounded-md bg-gray-900 dark:bg-gray-700 px-3 py-2 text-xs font-normal text-left text-gray-100 shadow-lg opacity-0 invisible transition-opacity group-hover:opacity-100 group-hover:visible group-focus:opacity-100 group-focus:visible"
+            class="pointer-events-none absolute left-0 top-full z-20 mt-1 w-max max-w-xs rounded-md bg-gray-900 dark:bg-gray-700 px-3 py-2 text-xs font-normal text-left text-gray-100 shadow-lg opacity-0 invisible transition-opacity group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible"
           >
             <span class="block mb-1 text-[10px] uppercase tracking-wider text-gray-400">
               {{ reposForTeam(team.key).length }} {{ reposForTeam(team.key).length === 1 ? 'repo' : 'repos' }}
@@ -45,57 +60,37 @@
               {{ repo }}
             </span>
           </span>
-          <div class="flex items-center gap-2.5">
-            <div class="text-center">
-              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-gray-900 dark:text-gray-100']">{{ teamStats(team.key).total }}</div>
-              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total</div>
+          <div class="grid grid-cols-3">
+            <div class="min-w-0 px-1 text-center">
+              <a :href="jiraSearchUrl(team.key, 'candidates')" target="_blank" rel="noopener noreferrer" :aria-label="`View ${team.label} candidates in Jira`" :class="['block text-xl font-bold hover:underline', selectedTeam === team.key ? 'text-white' : 'text-gray-900 dark:text-gray-100']">{{ teamStats(team.key).candidates }}</a>
+              <div :class="['text-[9px] uppercase leading-tight tracking-wide', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total candidate</div>
             </div>
-            <div :class="['w-px h-8', selectedTeam === team.key ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700']"></div>
-            <div class="text-center">
-              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-amber-600 dark:text-amber-400']">{{ teamStats(team.key).inProgress }}</div>
-              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">wip</div>
+            <div :class="['min-w-0 px-1 text-center border-l', selectedTeam === team.key ? 'border-white/20' : 'border-gray-200 dark:border-gray-700']">
+              <a :href="jiraSearchUrl(team.key, 'attempts')" target="_blank" rel="noopener noreferrer" :aria-label="`View ${team.label} attempts in Jira`" :class="['block text-xl font-bold hover:underline', selectedTeam === team.key ? 'text-white' : 'text-amber-600 dark:text-amber-400']">{{ teamStats(team.key).attempts }}</a>
+              <div :class="['text-[9px] uppercase leading-tight tracking-wide', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total attempts</div>
             </div>
-            <div :class="['w-px h-8', selectedTeam === team.key ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700']"></div>
-            <div class="text-center">
-              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-purple-600 dark:text-purple-400']">{{ teamStats(team.key).merged }}</div>
-              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">merged</div>
-            </div>
-            <div :class="['w-px h-8', selectedTeam === team.key ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700']"></div>
-            <div class="text-center" :title="mergeRateTitle(teamStats(team.key))">
-              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-emerald-600 dark:text-emerald-400']">{{ formatMergeRate(teamStats(team.key).mergeRate) }}</div>
-              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">merge rate</div>
+            <div :class="['min-w-0 px-1 text-center border-l', selectedTeam === team.key ? 'border-white/20' : 'border-gray-200 dark:border-gray-700']">
+              <a :href="jiraSearchUrl(team.key, 'merges')" target="_blank" rel="noopener noreferrer" :aria-label="`View ${team.label} merges in Jira`" :class="['block text-xl font-bold hover:underline', selectedTeam === team.key ? 'text-white' : 'text-emerald-600 dark:text-emerald-400']">{{ teamStats(team.key).merges }}</a>
+              <div :class="['text-[9px] uppercase leading-tight tracking-wide', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total merges</div>
             </div>
           </div>
-        </button>
+        </div>
       </div>
 
       <!-- Stat cards -->
-      <div class="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ displayMetrics.totalIssues }}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Total Issues</div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ displayMetrics.byState.new || 0 }}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">New</div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ displayMetrics.byState['ready-to-solve'] || 0 }}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Ready to Solve</div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-amber-600 dark:text-amber-400">{{ displayMetrics.byState['in-progress'] || 0 }}</div>
+      <div class="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <a :href="jiraSearchUrl(selectedTeam, 'candidates')" target="_blank" rel="noopener noreferrer" aria-label="View total candidates in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
+          <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ funnelMetrics.candidates }}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Total Candidates</div>
+        </a>
+        <a :href="jiraSearchUrl(selectedTeam, 'merges')" target="_blank" rel="noopener noreferrer" aria-label="View total merges in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
+          <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ funnelMetrics.merges }}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Total Merges</div>
+        </a>
+        <a :href="jiraSearchUrl(selectedTeam, 'in-progress')" target="_blank" rel="noopener noreferrer" aria-label="View in-progress candidates in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
+          <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ funnelMetrics.inProgress }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">In Progress</div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-gray-600 dark:text-gray-400">{{ displayMetrics.byState.closed || 0 }}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Closed</div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ displayMetrics.processedRate }}%</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Processed</div>
-          <div class="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{{ displayMetrics.processedCount }}/{{ displayMetrics.totalIssues }}</div>
-        </div>
+        </a>
       </div>
 
       <!-- Issue table -->
@@ -254,6 +249,7 @@ defineEmits(['retry']);
 // Teams without components/projectPrefixes match only rows that carry an
 // authoritative `team` (bot PR rows, attributed from the PR's repo).
 const TEAMS = [
+  { key: 'ocpbugs', label: 'OCPBUGS', projectPrefix: 'OCPBUGS' },
   { key: 'hypershift', label: 'HyperShift', components: ['HyperShift', 'Hosted Control Planes'] },
   { key: 'installer', label: 'Installer', components: ['Installer / openshift-installer'] },
   { key: 'trt', label: 'TRT', projectPrefix: 'TRT' },
@@ -272,7 +268,6 @@ const TEAMS = [
   { key: 'console', label: 'Console', components: ['Management Console'], projectPrefixes: ['CONSOLE'] },
   { key: 'olm', label: 'OLM & Operators', components: ['OLM'], projectPrefixes: ['OPRUN'] },
   { key: 'support', label: 'Support & Diagnostics', components: ['Insights Operator'], projectPrefixes: ['CCXDEV'] },
-  { key: 'edge-ecosystem', label: 'Edge & Ecosystem', components: [] },
 ];
 
 // Table columns, in render order. Each `key` matches a SORTERS entry, so the
@@ -370,20 +365,6 @@ const teamFilteredIssues = computed(() => {
   return filterByTeam(props.agentData.issues, selectedTeam.value);
 });
 
-// Merge rate as a percentage, or an em dash when the team has no PRs to
-// measure — a team that never opened a PR has no rate, which is not the same
-// as a 0% rate.
-function formatMergeRate(rate) {
-  return rate === null ? '—' : `${rate}%`;
-}
-
-// Spells out the ratio behind the percentage, since "merge rate" alone doesn't
-// say what it is a share of.
-function mergeRateTitle(stats) {
-  if (!stats.withPr) return 'No pull requests yet';
-  return `${stats.merged} of ${stats.withPr} rows with a PR have merged`;
-}
-
 // The team boxes read several stats each, so results are memoized per render
 // pass. The cache is keyed on the issues array identity: a new payload (or any
 // change to the underlying data) produces a new array and invalidates it.
@@ -403,45 +384,48 @@ function teamStats(teamKey) {
 
 function computeTeamStats(teamKey) {
   if (!props.agentData?.issues) {
-    return { total: 0, inProgress: 0, merged: 0, withPr: 0, mergeRate: null };
+    return { candidates: 0, attempts: 0, merges: 0 };
   }
-  const issues = filterByTeam(props.agentData.issues, teamKey);
-  let inProgress = 0;
-  let merged = 0;
-  let withPr = 0;
-  for (const i of issues) {
-    if (i.agentState === 'in-progress') inProgress++;
-    // "merged" reflects the PR outcome (a real GitHub merge), independent of the
-    // Jira status: any row whose rolled-up PR state is MERGED.
-    const status = prStatus(i);
-    if (status !== null) withPr++;
-    if (status === 'MERGED') merged++;
-  }
-  // Merge rate is measured against rows that actually produced a PR, not the
-  // team total — rows with no PR never had the chance to merge, so including
-  // them would understate how much of the agent's work lands. Null (rendered
-  // as an em dash) when the team has no PRs at all, rather than a false 0%.
-  const mergeRate = withPr > 0 ? Math.round((merged / withPr) * 100) : null;
-  return { total: issues.length, inProgress, merged, withPr, mergeRate };
+  const issues = candidateIssues(filterByTeam(props.agentData.issues, teamKey));
+  return {
+    candidates: issues.length,
+    attempts: issues.filter(issue => issue.processed).length,
+    merges: issues.filter(issue => issue.merged).length
+  };
 }
 
-function recomputeMetrics(issues) {
-  const byState = { new: 0, 'ready-to-solve': 0, 'in-progress': 0, closed: 0, other: 0 };
-  let processedCount = 0;
-  for (const issue of issues) {
-    byState[issue.agentState] = (byState[issue.agentState] || 0) + 1;
-    if (issue.processed) processedCount++;
-  }
-  const totalIssues = issues.length;
-  const processedRate = totalIssues > 0 ? Math.round((processedCount / totalIssues) * 100) : 0;
-  return { totalIssues, byState, processedCount, processedRate };
+function candidateIssues(issues) {
+  return issues.filter(issue => issue.source !== 'chai-bot-pr');
 }
 
-const displayMetrics = computed(() => {
-  if (selectedTeam.value === 'all') {
-    return props.agentData?.metrics || { totalIssues: 0, byState: {}, processedCount: 0, processedRate: 0 };
+function jiraSearchUrl(teamKey, metric) {
+  const team = TEAMS.find(option => option.key === teamKey);
+  let issueClause = 'project IN (OCPBUGS, CNTRLPLANE, TRT, WINC, MCO, NE) AND labels = "issue-for-agent"';
+  if (team) {
+    const mappings = [];
+    const prefixes = team.projectPrefixes || (team.projectPrefix ? [team.projectPrefix] : []);
+    if (prefixes.length) mappings.push(`project IN (${prefixes.join(', ')})`);
+    if (team.components?.length) {
+      const components = team.components.map(component => `"${component}"`).join(', ');
+      mappings.push(`component IN (${components})`);
+    }
+    issueClause = mappings.length ? `${issueClause} AND (${mappings.join(' OR ')})` : 'key = "__NO_MATCH__"';
   }
-  return recomputeMetrics(teamFilteredIssues.value);
+  let metricClause = '';
+  if (metric === 'attempts') metricClause = ' AND labels = "agent-processed"';
+  if (metric === 'merges') metricClause = ' AND resolution IN (Done, "Done-Errata")';
+  if (metric === 'in-progress') metricClause = ' AND statusCategory = "In Progress"';
+  return `${jiraHost.value}/issues/?jql=${encodeURIComponent(issueClause + metricClause)}`;
+}
+
+const funnelMetrics = computed(() => {
+  const issues = candidateIssues(teamFilteredIssues.value);
+  const candidates = issues.length;
+  const attempts = issues.filter(issue => issue.processed).length;
+  const merges = issues.filter(issue => issue.merged).length;
+  const inProgress = issues.filter(issue => issue.agentState === 'in-progress').length;
+  const mergeRate = candidates > 0 ? Math.round((merges / candidates) * 100) : 0;
+  return { candidates, attempts, merges, inProgress, mergeRate };
 });
 
 // Jira keys sort naturally: by project, then numerically, so OCPBUGS-9 comes

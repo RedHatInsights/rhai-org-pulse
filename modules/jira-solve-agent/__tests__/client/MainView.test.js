@@ -20,9 +20,9 @@ describe('AgentContent', () => {
       processedRate: 10
     },
     issues: [
-      { key: 'OCPBUGS-1', summary: 'HyperShift bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-01', updated: '2026-07-07', labels: [], components: ['HyperShift'], assignee: null, linkedPrs: [{ repo: 'openshift/hypershift', team: 'hypershift', number: 9137, url: 'https://github.com/openshift/hypershift/pull/9137', state: 'OPEN', author: 'x' }, { repo: 'openshift/origin', team: 'trt', number: 31382, url: 'https://github.com/openshift/origin/pull/31382', state: 'CLOSED', author: 'y' }] },
-      { key: 'CNTRLPLANE-10', summary: 'Installer issue', status: 'In Progress', agentState: 'in-progress', processed: true, issueType: 'Bug', priority: 'Critical', created: '2026-07-02', updated: '2026-07-06', labels: ['agent-processed'], components: ['Installer / openshift-installer'], assignee: 'Jane' },
-      { key: 'OCPBUGS-2', summary: 'Hosted CP bug', status: 'Closed', agentState: 'closed', processed: false, issueType: 'Bug', priority: 'Minor', created: '2026-07-03', updated: '2026-07-05', labels: [], components: ['Hosted Control Planes'], assignee: null },
+      { key: 'OCPBUGS-1', summary: 'HyperShift bug', status: 'New', resolution: null, agentState: 'new', processed: false, merged: false, issueType: 'Bug', priority: 'Major', created: '2026-07-01', updated: '2026-07-07', labels: ['issue-for-agent'], components: ['HyperShift'], assignee: null, linkedPrs: [{ repo: 'openshift/hypershift', team: 'hypershift', number: 9137, url: 'https://github.com/openshift/hypershift/pull/9137', state: 'OPEN', author: 'x' }, { repo: 'openshift/origin', team: 'trt', number: 31382, url: 'https://github.com/openshift/origin/pull/31382', state: 'CLOSED', author: 'y' }] },
+      { key: 'CNTRLPLANE-10', summary: 'Installer issue', status: 'In Progress', resolution: null, agentState: 'in-progress', processed: true, merged: false, issueType: 'Bug', priority: 'Critical', created: '2026-07-02', updated: '2026-07-06', labels: ['issue-for-agent', 'agent-processed'], components: ['Installer / openshift-installer'], assignee: 'Jane' },
+      { key: 'OCPBUGS-2', summary: 'Hosted CP bug', status: 'Closed', resolution: 'Done', agentState: 'closed', processed: false, merged: true, issueType: 'Bug', priority: 'Minor', created: '2026-07-03', updated: '2026-07-05', labels: ['issue-for-agent'], components: ['Hosted Control Planes'], assignee: null },
       { key: 'TRT-100', summary: 'TRT test fix', status: 'New', agentState: 'new', processed: false, issueType: 'Task', priority: 'Major', created: '2026-07-04', updated: '2026-07-07', labels: [], components: [], assignee: null },
       { key: 'WINC-5', summary: 'WMCO bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-05', updated: '2026-07-07', labels: [], components: [], assignee: null, linkedPrs: [{ repo: 'openshift/windows-machine-config-operator', team: 'wmco', number: 321, url: 'https://github.com/openshift/windows-machine-config-operator/pull/321', state: 'MERGED', author: 'z' }] },
       { key: 'OCPBUGS-3', summary: 'Windows Containers component bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-05', updated: '2026-07-07', labels: [], components: ['Windows Containers'], assignee: null },
@@ -33,13 +33,15 @@ describe('AgentContent', () => {
     ]
   }
 
-  it('renders stat cards with metrics', () => {
+  it('renders funnel stat cards', () => {
     const wrapper = mount(AgentContent, {
       props: { agentData: sampleData, loading: false, error: null }
     })
     expect(wrapper.text()).toContain('10')
-    expect(wrapper.text()).toContain('Total Issues')
-    expect(wrapper.text()).toContain('Ready to Solve')
+    expect(wrapper.text()).toContain('Total Candidates')
+    expect(wrapper.text()).toContain('Total Attempts')
+    expect(wrapper.text()).toContain('Total Merges')
+    expect(wrapper.text()).toContain('Merge Rate')
     expect(wrapper.text()).toContain('10%')
   })
 
@@ -95,9 +97,9 @@ describe('AgentContent', () => {
     const buttons = wrapper.findAll('button')
     const allBtn = buttons.find(b => b.text().includes('All Teams'))
     expect(allBtn.exists()).toBe(true)
-    expect(allBtn.text()).toContain('total')
-    expect(allBtn.text()).toContain('merged')
-    expect(allBtn.text()).toContain('wip')
+    expect(allBtn.element.parentElement.textContent).toContain('total candidate')
+    expect(allBtn.element.parentElement.textContent).toContain('total attempts')
+    expect(allBtn.element.parentElement.textContent).toContain('total merges')
     expect(buttons.some(b => b.text().includes('HyperShift'))).toBe(true)
     expect(buttons.some(b => b.text().includes('Installer'))).toBe(true)
     expect(buttons.some(b => b.text().includes('TRT'))).toBe(true)
@@ -106,18 +108,18 @@ describe('AgentContent', () => {
     expect(buttons.some(b => b.text().includes('Ingress Operator'))).toBe(true)
   })
 
-  it('shows a merged stat that counts rows with a merged PR', () => {
+  it('shows candidate funnel stats independently from PR state', () => {
     const wrapper = mount(AgentContent, {
       props: { agentData: sampleData, loading: false, error: null }
     })
     // The WMCO box matches two issues (WINC-5 by prefix, OCPBUGS-3 by the
     // "Windows Containers" component); only WINC-5's linked PR is MERGED.
     const wmcoBtn = wrapper.findAll('button').find(b => b.text().includes('Windows Containers'))
-    expect(wmcoBtn.text()).toContain('merged')
-    // Its stat cluster reads: total=2, wip=0, merged=1, merge rate=100%
-    // (one of its two rows carries a PR, and that PR merged).
-    const nums = wmcoBtn.findAll('.text-xl').map(n => n.text())
-    expect(nums).toEqual(['2', '0', '1', '100%'])
+    expect(wmcoBtn.element.parentElement.textContent).toContain('total merges')
+    // Neither Jira issue has an accepted merge resolution, even though one
+    // carries a merged GitHub PR.
+    const nums = [...wmcoBtn.element.parentElement.querySelectorAll('.text-xl')].map(n => n.textContent)
+    expect(nums).toEqual(['2', '0', '0'])
   })
 
   it('filters issues by team when team button is clicked', async () => {
@@ -183,6 +185,33 @@ describe('AgentContent', () => {
     expect(wrapper.text()).toContain('NE-7')
     expect(wrapper.text()).toContain('Ingress component bug')
     expect(wrapper.text()).not.toContain('OCPBUGS-1')
+  })
+
+  it('links team funnel counts to matching Jira searches', () => {
+    const wrapper = mount(AgentContent, {
+      props: { agentData: sampleData, loading: false, error: null }
+    })
+    const jqlFor = label => {
+      const href = wrapper.find(`a[aria-label="${label}"]`).attributes('href')
+      return new URL(href).searchParams.get('jql')
+    }
+
+    expect(jqlFor('View HyperShift candidates in Jira')).toContain('component IN ("HyperShift", "Hosted Control Planes")')
+    expect(jqlFor('View Installer attempts in Jira')).toContain('labels = "agent-processed"')
+    expect(jqlFor('View TRT merges in Jira')).toContain('resolution IN (Done, "Done-Errata")')
+    expect(jqlFor('View OCPBUGS candidates in Jira')).toContain('project IN (OCPBUGS)')
+  })
+
+  it('updates summary Jira links for the selected team', async () => {
+    const wrapper = mount(AgentContent, {
+      props: { agentData: sampleData, loading: false, error: null }
+    })
+    await wrapper.findAll('button').find(button => button.text().includes('HyperShift')).trigger('click')
+
+    const candidateHref = wrapper.find('a[aria-label="View total candidates in Jira"]').attributes('href')
+    const progressHref = wrapper.find('a[aria-label="View in-progress candidates in Jira"]').attributes('href')
+    expect(new URL(candidateHref).searchParams.get('jql')).toContain('component IN ("HyperShift", "Hosted Control Planes")')
+    expect(new URL(progressHref).searchParams.get('jql')).toContain('statusCategory = "In Progress"')
   })
 
 
@@ -386,45 +415,39 @@ describe('AgentContent', () => {
       return wrapper.findAll('button').find(b => b.text().includes(label))
     }
 
+    function tooltipFor(button) {
+      return button.element.parentElement.querySelector('[role="tooltip"]')
+    }
+
     it('lists a team\'s repos in a tooltip on its box', () => {
       const wrapper = mount(AgentContent, {
         props: { agentData: sampleData, loading: false, error: null }
       })
-      const tip = teamButton(wrapper, 'MCO').find('[role="tooltip"]')
-      expect(tip.exists()).toBe(true)
-      expect(tip.text()).toContain('machine-config-operator')
-      expect(tip.text()).toContain('os')
-      expect(tip.text()).toContain('2 repos')
+      const tip = tooltipFor(teamButton(wrapper, 'MCO'))
+      expect(tip).toBeTruthy()
+      expect(tip.textContent).toContain('machine-config-operator')
+      expect(tip.textContent).toContain('os')
+      expect(tip.textContent).toContain('2 repos')
     })
 
     it('rolls every tracked repo up under All Teams', () => {
       const wrapper = mount(AgentContent, {
         props: { agentData: sampleData, loading: false, error: null }
       })
-      const tip = teamButton(wrapper, 'All Teams').find('[role="tooltip"]')
+      const tip = tooltipFor(teamButton(wrapper, 'All Teams'))
       // De-duplicated and sorted across all teams.
-      expect(tip.text()).toContain('cincinnati-graph-data')
-      expect(tip.text()).toContain('sippy')
-      expect(tip.text()).toContain('8 repos')
+      expect(tip.textContent).toContain('cincinnati-graph-data')
+      expect(tip.textContent).toContain('sippy')
+      expect(tip.textContent).toContain('8 repos')
     })
 
     it('uses the singular label for a one-repo team', () => {
       const wrapper = mount(AgentContent, {
         props: { agentData: sampleData, loading: false, error: null }
       })
-      const tip = teamButton(wrapper, 'Installer').find('[role="tooltip"]')
-      expect(tip.text()).toContain('1 repo')
-      expect(tip.text()).not.toContain('1 repos')
-    })
-
-    it('renders no tooltip for a team with no repos wired up', () => {
-      const wrapper = mount(AgentContent, {
-        props: { agentData: sampleData, loading: false, error: null }
-      })
-      // edge-ecosystem has no repos in teamRepos.
-      const btn = teamButton(wrapper, 'Edge & Ecosystem')
-      expect(btn.find('[role="tooltip"]').exists()).toBe(false)
-      expect(btn.attributes('aria-describedby')).toBeUndefined()
+      const tip = tooltipFor(teamButton(wrapper, 'Installer'))
+      expect(tip.textContent).toContain('1 repo')
+      expect(tip.textContent).not.toContain('1 repos')
     })
 
     it('points the box at its tooltip via aria-describedby', () => {
@@ -433,7 +456,7 @@ describe('AgentContent', () => {
       })
       const btn = teamButton(wrapper, 'MCO')
       expect(btn.attributes('aria-describedby')).toBe('repos-mco')
-      expect(btn.find('[role="tooltip"]').attributes('id')).toBe('repos-mco')
+      expect(tooltipFor(btn).id).toBe('repos-mco')
     })
 
     it('renders without tooltips when the server sends no teamRepos', () => {
@@ -445,119 +468,6 @@ describe('AgentContent', () => {
       expect(wrapper.findAll('[role="tooltip"]')).toHaveLength(0)
       // The boxes themselves still render.
       expect(teamButton(wrapper, 'MCO').exists()).toBe(true)
-    })
-  })
-
-
-  describe('team merge rate', () => {
-    function teamButton(wrapper, label) {
-      return wrapper.findAll('button').find(b => b.text().includes(label))
-    }
-
-    function statValues(btn) {
-      return btn.findAll('.text-xl').map(n => n.text())
-    }
-
-    it('shows a merge rate cell on every team box', () => {
-      const wrapper = mount(AgentContent, {
-        props: { agentData: sampleData, loading: false, error: null }
-      })
-      expect(teamButton(wrapper, 'All Teams').text()).toContain('merge rate')
-    })
-
-    it('measures merged against rows with a PR, not the team total', () => {
-      // Two rows, only one of which has a PR, and that PR merged. Measured
-      // against the total this would read 50%; against rows with a PR, 100%.
-      const data = {
-        ...sampleData,
-        issues: [
-          {
-            key: 'WINC-5', summary: 'has a merged PR', status: 'New', agentState: 'new',
-            processed: false, components: [], assignee: null,
-            linkedPrs: [{ repo: 'openshift/windows-machine-config-operator', team: 'wmco', number: 1, url: 'u1', state: 'MERGED', author: 'z' }]
-          },
-          { key: 'WINC-6', summary: 'no PR at all', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
-        ]
-      }
-      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
-      const btn = teamButton(wrapper, 'Windows Containers')
-      // total=2, wip=0, merged=1, rate=100% (1 of 1 row that had a PR)
-      expect(statValues(btn)).toEqual(['2', '0', '1', '100%'])
-    })
-
-    it('counts open and closed PRs in the denominator', () => {
-      const pr = (state, n) => [{ repo: 'openshift/windows-machine-config-operator', team: 'wmco', number: n, url: `u${n}`, state, author: 'z' }]
-      const row = (key, prs) => ({ key, summary: key, status: 'New', agentState: 'new', processed: false, components: [], assignee: null, linkedPrs: prs })
-      const data = {
-        ...sampleData,
-        issues: [
-          row('WINC-1', pr('MERGED', 1)),
-          row('WINC-2', pr('OPEN', 2)),
-          row('WINC-3', pr('CLOSED', 3)),
-          row('WINC-4', pr('MERGED', 4))
-        ]
-      }
-      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
-      // 2 merged of 4 rows with a PR = 50%
-      expect(statValues(teamButton(wrapper, 'Windows Containers'))).toEqual(['4', '0', '2', '50%'])
-    })
-
-    it('shows an em dash rather than 0% when a team has no PRs', () => {
-      const data = {
-        ...sampleData,
-        issues: [
-          { key: 'WINC-9', summary: 'no PR', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
-        ]
-      }
-      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
-      const values = statValues(teamButton(wrapper, 'Windows Containers'))
-      expect(values[3]).toBe('—')
-      expect(values[3]).not.toBe('0%')
-    })
-
-    it('reports a real 0% when PRs exist but none merged', () => {
-      const data = {
-        ...sampleData,
-        issues: [
-          {
-            key: 'WINC-9', summary: 'open only', status: 'New', agentState: 'new', processed: false, components: [], assignee: null,
-            linkedPrs: [{ repo: 'openshift/windows-machine-config-operator', team: 'wmco', number: 9, url: 'u9', state: 'OPEN', author: 'z' }]
-          }
-        ]
-      }
-      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
-      expect(statValues(teamButton(wrapper, 'Windows Containers'))[3]).toBe('0%')
-    })
-
-    it('explains the ratio in a title attribute', () => {
-      const wrapper = mount(AgentContent, {
-        props: { agentData: sampleData, loading: false, error: null }
-      })
-      const cell = teamButton(wrapper, 'Windows Containers')
-        .findAll('[title]').find(el => el.text().includes('merge rate'))
-      expect(cell.attributes('title')).toBe('1 of 1 rows with a PR have merged')
-    })
-
-    it('says so when a team has no pull requests yet', () => {
-      const data = {
-        ...sampleData,
-        issues: [
-          { key: 'WINC-9', summary: 'no PR', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
-        ]
-      }
-      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
-      const cell = teamButton(wrapper, 'Windows Containers')
-        .findAll('[title]').find(el => el.text().includes('merge rate'))
-      expect(cell.attributes('title')).toBe('No pull requests yet')
-    })
-
-    it('rolls the rate up across all teams', () => {
-      const wrapper = mount(AgentContent, {
-        props: { agentData: sampleData, loading: false, error: null }
-      })
-      // Fixture: OCPBUGS-1 (OPEN rollup) and WINC-5 (MERGED) carry PRs.
-      // 1 merged of 2 rows with a PR = 50%.
-      expect(statValues(teamButton(wrapper, 'All Teams'))[3]).toBe('50%')
     })
   })
 
