@@ -1,0 +1,14 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    ":disableMajorUpdates",
+    "github>konflux-ci/mintmaker-presets:cve-automerge-all",
+    "helpers:pinGitHubActionDigestsToSemver"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "groupName": "node dependencies"
+    }
+  ]
+}
