@@ -45,7 +45,7 @@
               {{ repo }}
             </span>
           </span>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2.5">
             <div class="text-center">
               <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-gray-900 dark:text-gray-100']">{{ teamStats(team.key).total }}</div>
               <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total</div>
@@ -59,6 +59,11 @@
             <div class="text-center">
               <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-purple-600 dark:text-purple-400']">{{ teamStats(team.key).merged }}</div>
               <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">merged</div>
+            </div>
+            <div :class="['w-px h-8', selectedTeam === team.key ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700']"></div>
+            <div class="text-center" :title="mergeRateTitle(teamStats(team.key))">
+              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-emerald-600 dark:text-emerald-400']">{{ formatMergeRate(teamStats(team.key).mergeRate) }}</div>
+              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">merge rate</div>
             </div>
           </div>
         </button>
@@ -365,18 +370,59 @@ const teamFilteredIssues = computed(() => {
   return filterByTeam(props.agentData.issues, selectedTeam.value);
 });
 
+// Merge rate as a percentage, or an em dash when the team has no PRs to
+// measure — a team that never opened a PR has no rate, which is not the same
+// as a 0% rate.
+function formatMergeRate(rate) {
+  return rate === null ? '—' : `${rate}%`;
+}
+
+// Spells out the ratio behind the percentage, since "merge rate" alone doesn't
+// say what it is a share of.
+function mergeRateTitle(stats) {
+  if (!stats.withPr) return 'No pull requests yet';
+  return `${stats.merged} of ${stats.withPr} rows with a PR have merged`;
+}
+
+// The team boxes read several stats each, so results are memoized per render
+// pass. The cache is keyed on the issues array identity: a new payload (or any
+// change to the underlying data) produces a new array and invalidates it.
+const teamStatsCache = computed(() => {
+  // Depend on the issues array so the cache is rebuilt whenever data changes.
+  void props.agentData?.issues;
+  return new Map();
+});
+
 function teamStats(teamKey) {
-  if (!props.agentData?.issues) return { total: 0, inProgress: 0, merged: 0 };
+  const cache = teamStatsCache.value;
+  if (cache.has(teamKey)) return cache.get(teamKey);
+  const stats = computeTeamStats(teamKey);
+  cache.set(teamKey, stats);
+  return stats;
+}
+
+function computeTeamStats(teamKey) {
+  if (!props.agentData?.issues) {
+    return { total: 0, inProgress: 0, merged: 0, withPr: 0, mergeRate: null };
+  }
   const issues = filterByTeam(props.agentData.issues, teamKey);
   let inProgress = 0;
   let merged = 0;
+  let withPr = 0;
   for (const i of issues) {
     if (i.agentState === 'in-progress') inProgress++;
     // "merged" reflects the PR outcome (a real GitHub merge), independent of the
     // Jira status: any row whose rolled-up PR state is MERGED.
-    if (prStatus(i) === 'MERGED') merged++;
+    const status = prStatus(i);
+    if (status !== null) withPr++;
+    if (status === 'MERGED') merged++;
   }
-  return { total: issues.length, inProgress, merged };
+  // Merge rate is measured against rows that actually produced a PR, not the
+  // team total — rows with no PR never had the chance to merge, so including
+  // them would understate how much of the agent's work lands. Null (rendered
+  // as an em dash) when the team has no PRs at all, rather than a false 0%.
+  const mergeRate = withPr > 0 ? Math.round((merged / withPr) * 100) : null;
+  return { total: issues.length, inProgress, merged, withPr, mergeRate };
 }
 
 function recomputeMetrics(issues) {

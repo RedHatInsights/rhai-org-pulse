@@ -114,9 +114,10 @@ describe('AgentContent', () => {
     // "Windows Containers" component); only WINC-5's linked PR is MERGED.
     const wmcoBtn = wrapper.findAll('button').find(b => b.text().includes('Windows Containers'))
     expect(wmcoBtn.text()).toContain('merged')
-    // Its stat cluster reads: total=2, wip=0, merged=1.
+    // Its stat cluster reads: total=2, wip=0, merged=1, merge rate=100%
+    // (one of its two rows carries a PR, and that PR merged).
     const nums = wmcoBtn.findAll('.text-xl').map(n => n.text())
-    expect(nums).toEqual(['2', '0', '1'])
+    expect(nums).toEqual(['2', '0', '1', '100%'])
   })
 
   it('filters issues by team when team button is clicked', async () => {
@@ -444,6 +445,119 @@ describe('AgentContent', () => {
       expect(wrapper.findAll('[role="tooltip"]')).toHaveLength(0)
       // The boxes themselves still render.
       expect(teamButton(wrapper, 'MCO').exists()).toBe(true)
+    })
+  })
+
+
+  describe('team merge rate', () => {
+    function teamButton(wrapper, label) {
+      return wrapper.findAll('button').find(b => b.text().includes(label))
+    }
+
+    function statValues(btn) {
+      return btn.findAll('.text-xl').map(n => n.text())
+    }
+
+    it('shows a merge rate cell on every team box', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      expect(teamButton(wrapper, 'All Teams').text()).toContain('merge rate')
+    })
+
+    it('measures merged against rows with a PR, not the team total', () => {
+      // Two rows, only one of which has a PR, and that PR merged. Measured
+      // against the total this would read 50%; against rows with a PR, 100%.
+      const data = {
+        ...sampleData,
+        issues: [
+          {
+            key: 'WINC-5', summary: 'has a merged PR', status: 'New', agentState: 'new',
+            processed: false, components: [], assignee: null,
+            linkedPrs: [{ repo: 'openshift/windows-machine-config-operator', team: 'wmco', number: 1, url: 'u1', state: 'MERGED', author: 'z' }]
+          },
+          { key: 'WINC-6', summary: 'no PR at all', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      const btn = teamButton(wrapper, 'Windows Containers')
+      // total=2, wip=0, merged=1, rate=100% (1 of 1 row that had a PR)
+      expect(statValues(btn)).toEqual(['2', '0', '1', '100%'])
+    })
+
+    it('counts open and closed PRs in the denominator', () => {
+      const pr = (state, n) => [{ repo: 'openshift/windows-machine-config-operator', team: 'wmco', number: n, url: `u${n}`, state, author: 'z' }]
+      const row = (key, prs) => ({ key, summary: key, status: 'New', agentState: 'new', processed: false, components: [], assignee: null, linkedPrs: prs })
+      const data = {
+        ...sampleData,
+        issues: [
+          row('WINC-1', pr('MERGED', 1)),
+          row('WINC-2', pr('OPEN', 2)),
+          row('WINC-3', pr('CLOSED', 3)),
+          row('WINC-4', pr('MERGED', 4))
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      // 2 merged of 4 rows with a PR = 50%
+      expect(statValues(teamButton(wrapper, 'Windows Containers'))).toEqual(['4', '0', '2', '50%'])
+    })
+
+    it('shows an em dash rather than 0% when a team has no PRs', () => {
+      const data = {
+        ...sampleData,
+        issues: [
+          { key: 'WINC-9', summary: 'no PR', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      const values = statValues(teamButton(wrapper, 'Windows Containers'))
+      expect(values[3]).toBe('—')
+      expect(values[3]).not.toBe('0%')
+    })
+
+    it('reports a real 0% when PRs exist but none merged', () => {
+      const data = {
+        ...sampleData,
+        issues: [
+          {
+            key: 'WINC-9', summary: 'open only', status: 'New', agentState: 'new', processed: false, components: [], assignee: null,
+            linkedPrs: [{ repo: 'openshift/windows-machine-config-operator', team: 'wmco', number: 9, url: 'u9', state: 'OPEN', author: 'z' }]
+          }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      expect(statValues(teamButton(wrapper, 'Windows Containers'))[3]).toBe('0%')
+    })
+
+    it('explains the ratio in a title attribute', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const cell = teamButton(wrapper, 'Windows Containers')
+        .findAll('[title]').find(el => el.text().includes('merge rate'))
+      expect(cell.attributes('title')).toBe('1 of 1 rows with a PR have merged')
+    })
+
+    it('says so when a team has no pull requests yet', () => {
+      const data = {
+        ...sampleData,
+        issues: [
+          { key: 'WINC-9', summary: 'no PR', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      const cell = teamButton(wrapper, 'Windows Containers')
+        .findAll('[title]').find(el => el.text().includes('merge rate'))
+      expect(cell.attributes('title')).toBe('No pull requests yet')
+    })
+
+    it('rolls the rate up across all teams', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      // Fixture: OCPBUGS-1 (OPEN rollup) and WINC-5 (MERGED) carry PRs.
+      // 1 merged of 2 rows with a PR = 50%.
+      expect(statValues(teamButton(wrapper, 'All Teams'))[3]).toBe('50%')
     })
   })
 
