@@ -21,6 +21,10 @@ const BOT_LOGIN = 'redhat-chai-bot';
 // Hydration is latency-bound single-object GETs, so it runs as a rolling pool
 // of workers rather than fixed batches — no worker idles waiting on a slow peer.
 const HYDRATE_CONCURRENCY = 30;
+
+// GitHub's search API is rate-limited far more tightly than the REST API
+// (roughly 30 requests/minute), so repo searches run in small waves.
+const SEARCH_CONCURRENCY = 8;
 const HYDRATE_MAX_RETRIES = 3;
 const HYDRATE_BACKOFF_BASE_MS = 1000;
 const HYDRATE_MAX_BACKOFF_MS = 30000;
@@ -31,15 +35,75 @@ function sleep(ms) {
 
 // Repo -> team key. Team keys match the client's TEAMS list in AgentContent.vue.
 // This map doubles as the fetch list and the team-attribution filter.
-const REPO_TEAMS = [
-  { repo: 'openshift/machine-config-operator', team: 'mco' },
-  { repo: 'openshift/cluster-ingress-operator', team: 'ingress' },
-  { repo: 'openshift/windows-machine-config-operator', team: 'wmco' },
-  { repo: 'openshift/installer', team: 'installer' },
-  { repo: 'openshift/hypershift', team: 'hypershift' },
-  { repo: 'openshift/sippy', team: 'trt' },
-  { repo: 'openshift/origin', team: 'trt' }
-];
+//
+// Grouped by owning area rather than one team per repo: the client renders one
+// selector button per team, so per-repo teams would swamp the UI. Declared as
+// team -> repos and flattened below, which keeps each area's membership legible.
+const TEAM_REPOS = {
+  mco: ['machine-config-operator', 'os'],
+  ingress: ['cluster-ingress-operator', 'router'],
+  wmco: ['windows-machine-config-operator'],
+  installer: ['installer'],
+  hypershift: ['hypershift'],
+  trt: ['sippy', 'origin', 'ci-tools', 'ci-docs', 'ci-tools-standalone', 'enhancements'],
+  ota: ['cluster-version-operator', 'cincinnati-graph-data'],
+  'kube-api': [
+    'kubernetes',
+    'api',
+    'oc',
+    'cluster-kube-apiserver-operator',
+    'cluster-openshift-apiserver-operator',
+    'cluster-authentication-operator',
+    'ocp-release-operator-sdk'
+  ],
+  oadp: [
+    'oadp-operator',
+    'velero',
+    'velero-plugin-for-aws',
+    'velero-plugin-for-gcp',
+    'velero-plugin-for-microsoft-azure',
+    'velero-plugin-for-legacy-aws',
+    'openshift-velero-plugin',
+    'oadp-must-gather'
+  ],
+  networking: ['ovn-kubernetes', 'cluster-network-operator', 'multus-cni', 'ptp-operator'],
+  etcd: ['etcd', 'cluster-etcd-operator'],
+  storage: [
+    'lvm-operator',
+    'local-storage-operator',
+    'csi-operator',
+    'secrets-store-csi-driver',
+    'csi-external-snapshotter',
+    'csi-driver-smb',
+    'cluster-image-registry-operator'
+  ],
+  'cloud-providers': [
+    'cloud-provider-kubevirt',
+    'cloud-provider-azure',
+    'cloud-provider-ibm',
+    'cluster-cloud-controller-manager-operator',
+    'cloud-credential-operator'
+  ],
+  'cluster-lifecycle': [
+    'cluster-samples-operator',
+    'cluster-baremetal-operator',
+    'assisted-service',
+    'oc-mirror'
+  ],
+  'machine-api': [
+    'cluster-control-plane-machine-set-operator',
+    'cluster-api-actuator-pkg',
+    'machine-api-provider-gcp',
+    'kubernetes-autoscaler'
+  ],
+  console: ['console', 'console-operator'],
+  olm: ['operator-framework-olm', 'ansible-operator-plugins', 'kueue-operator'],
+  support: ['insights-operator', 'must-gather']
+};
+
+const REPO_TEAMS = Object.entries(TEAM_REPOS).flatMap(([team, repos]) =>
+  repos.map(name => ({ repo: `openshift/${name}`, team }))
+);
 
 // Leading Jira key in a PR title. Excludes CVE- (not a Jira project).
 const JIRA_KEY_RE = /\b([A-Z][A-Z0-9]+-\d+)\b/g;
@@ -137,6 +201,7 @@ async function fetchRepoPrs(repo, token) {
  * Fetch all bot PRs across the wired-up repos.
  * @param {object} [options]
  * @param {string} options.token - GitHub API token
+ * @param {number} [options.concurrency] - repo searches in flight at once
  * @returns {Promise<Array<{repo:string,team:string,number:number,title:string,url:string,state:string,createdAt:string,jiraKey:string|null}>>}
  */
 async function fetchAgentPrs(options = {}) {
@@ -145,33 +210,43 @@ async function fetchAgentPrs(options = {}) {
     throw new Error('GITHUB_TOKEN is not configured');
   }
 
-  // Each repo is an independent paginated search, so they run concurrently.
-  // `allSettled` keeps the per-repo error isolation of the original serial
-  // loop: one repo failing degrades that repo only, never the whole fetch.
-  const settled = await Promise.allSettled(
-    REPO_TEAMS.map(({ repo }) => fetchRepoPrs(repo, token))
+  // Each repo is an independent paginated search, so they run concurrently —
+  // but GitHub's search API is rate-limited far more tightly than the REST API,
+  // so they go in bounded waves rather than all at once. `allSettled` keeps the
+  // per-repo error isolation of the original serial loop: one repo failing
+  // degrades that repo only, never the whole fetch.
+  const concurrency = Math.max(
+    1,
+    options.concurrency != null ? options.concurrency : SEARCH_CONCURRENCY
   );
 
   const all = [];
-  settled.forEach((outcome, i) => {
-    const { repo, team } = REPO_TEAMS[i];
-    if (outcome.status === 'rejected') {
-      console.warn(`[jira-solve-agent] Failed to fetch PRs for ${repo}: ${outcome.reason.message}`);
-      return;
-    }
-    for (const pr of outcome.value) {
-      all.push({
-        repo,
-        team,
-        number: pr.number,
-        title: pr.title,
-        url: pr.url,
-        state: pr.state,
-        createdAt: pr.createdAt,
-        jiraKey: extractJiraKey(pr.title)
-      });
-    }
-  });
+  for (let i = 0; i < REPO_TEAMS.length; i += concurrency) {
+    const wave = REPO_TEAMS.slice(i, i + concurrency);
+    const settled = await Promise.allSettled(
+      wave.map(({ repo }) => fetchRepoPrs(repo, token))
+    );
+
+    settled.forEach((outcome, j) => {
+      const { repo, team } = wave[j];
+      if (outcome.status === 'rejected') {
+        console.warn(`[jira-solve-agent] Failed to fetch PRs for ${repo}: ${outcome.reason.message}`);
+        return;
+      }
+      for (const pr of outcome.value) {
+        all.push({
+          repo,
+          team,
+          number: pr.number,
+          title: pr.title,
+          url: pr.url,
+          state: pr.state,
+          createdAt: pr.createdAt,
+          jiraKey: extractJiraKey(pr.title)
+        });
+      }
+    });
+  }
 
   return all;
 }
@@ -371,9 +446,11 @@ module.exports = {
   hydratePullRequestState,
   prStateFromRestPull,
   extractJiraKey,
+  TEAM_REPOS,
   REPO_TEAMS,
   AGENT_REPOS,
   REPO_TEAM_BY_NAME,
   BOT_LOGIN,
-  HYDRATE_CONCURRENCY
+  HYDRATE_CONCURRENCY,
+  SEARCH_CONCURRENCY
 };

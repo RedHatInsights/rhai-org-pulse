@@ -6,6 +6,13 @@ describe('AgentContent', () => {
   const sampleData = {
     fetchedAt: '2026-07-07T10:00:00Z',
     jiraHost: 'https://redhat.atlassian.net',
+    teamRepos: {
+      hypershift: ['hypershift'],
+      installer: ['installer'],
+      trt: ['sippy', 'origin'],
+      mco: ['machine-config-operator', 'os'],
+      ota: ['cluster-version-operator', 'cincinnati-graph-data']
+    },
     metrics: {
       totalIssues: 10,
       byState: { new: 2, 'ready-to-solve': 0, 'in-progress': 1, closed: 1 },
@@ -175,6 +182,269 @@ describe('AgentContent', () => {
     expect(wrapper.text()).toContain('NE-7')
     expect(wrapper.text()).toContain('Ingress component bug')
     expect(wrapper.text()).not.toContain('OCPBUGS-1')
+  })
+
+
+  // Row keys in table order, so sort assertions read as the visible ordering.
+  function renderedKeys(wrapper) {
+    return wrapper.findAll('tbody tr').map(tr => tr.findAll('td')[0].text())
+  }
+
+  function headerButton(wrapper, label) {
+    return wrapper.findAll('thead th button').find(b => b.text().startsWith(label))
+  }
+
+  describe('column filters', () => {
+    it('offers a PR status filter matching the PR Status column', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const select = wrapper.find('select[aria-label="Filter by PR status"]')
+      expect(select.exists()).toBe(true)
+      const values = select.findAll('option').map(o => o.attributes('value'))
+      expect(values).toEqual(['all', 'OPEN', 'MERGED', 'CLOSED', 'UNKNOWN', 'none'])
+    })
+
+    it('filters rows down to a chosen PR status', async () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      await wrapper.find('select[aria-label="Filter by PR status"]').setValue('MERGED')
+      // Only WINC-5 has a MERGED linked PR.
+      expect(renderedKeys(wrapper)).toEqual(['WINC-5'])
+    })
+
+    it('filters rows with no PR at all via the "No PR" option', async () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      await wrapper.find('select[aria-label="Filter by PR status"]').setValue('none')
+      const keys = renderedKeys(wrapper)
+      // Rows carrying linked PRs are excluded; the rest remain.
+      expect(keys).not.toContain('OCPBUGS-1')
+      expect(keys).not.toContain('WINC-5')
+      expect(keys).toContain('CNTRLPLANE-10')
+    })
+
+    it('keeps the Jira state filter working alongside the PR filter', async () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      await wrapper.find('select[aria-label="Filter by Jira state"]').setValue('in-progress')
+      expect(renderedKeys(wrapper)).toEqual(['CNTRLPLANE-10'])
+    })
+
+    it('no longer shows the orphaned processed filter', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const optionText = wrapper.findAll('option').map(o => o.text())
+      expect(optionText).not.toContain('Not Processed')
+    })
+  })
+
+  describe('column sorting', () => {
+    it('renders every column header as a sort button', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const labels = wrapper.findAll('thead th button').map(b => b.text().replace(/[▲▼]/g, '').trim())
+      expect(labels).toEqual(['Key', 'Summary', 'PR Status', 'PR', 'Jira Status'])
+    })
+
+    it('sorts by key numerically within a project, not lexicographically', async () => {
+      const data = {
+        ...sampleData,
+        issues: [
+          { key: 'OCPBUGS-100', summary: 'c', status: 'New', agentState: 'new', processed: false, components: [], assignee: null },
+          { key: 'OCPBUGS-9', summary: 'a', status: 'New', agentState: 'new', processed: false, components: [], assignee: null },
+          { key: 'CNTRLPLANE-2', summary: 'b', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      await headerButton(wrapper, 'Key').trigger('click')
+      expect(renderedKeys(wrapper)).toEqual(['CNTRLPLANE-2', 'OCPBUGS-9', 'OCPBUGS-100'])
+    })
+
+    it('cycles ascending, descending, then back to the default order', async () => {
+      const data = {
+        ...sampleData,
+        issues: [
+          { key: 'OCPBUGS-100', summary: 'c', status: 'New', agentState: 'new', processed: false, components: [], assignee: null },
+          { key: 'OCPBUGS-9', summary: 'a', status: 'New', agentState: 'new', processed: false, components: [], assignee: null },
+          { key: 'CNTRLPLANE-2', summary: 'b', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      const btn = () => headerButton(wrapper, 'Key')
+
+      await btn().trigger('click')
+      expect(renderedKeys(wrapper)).toEqual(['CNTRLPLANE-2', 'OCPBUGS-9', 'OCPBUGS-100'])
+
+      await btn().trigger('click')
+      expect(renderedKeys(wrapper)).toEqual(['OCPBUGS-100', 'OCPBUGS-9', 'CNTRLPLANE-2'])
+
+      // Third click clears the sort, restoring the server's ordering.
+      await btn().trigger('click')
+      expect(renderedKeys(wrapper)).toEqual(['OCPBUGS-100', 'OCPBUGS-9', 'CNTRLPLANE-2'])
+    })
+
+    it('sorts by summary alphabetically', async () => {
+      const data = {
+        ...sampleData,
+        issues: [
+          { key: 'A-1', summary: 'zebra', status: 'New', agentState: 'new', processed: false, components: [], assignee: null },
+          { key: 'A-2', summary: 'apple', status: 'New', agentState: 'new', processed: false, components: [], assignee: null }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      await headerButton(wrapper, 'Summary').trigger('click')
+      expect(renderedKeys(wrapper)).toEqual(['A-2', 'A-1'])
+    })
+
+    it('sorts by PR status in lifecycle order with no-PR rows last', async () => {
+      const pr = (state, number) => [{ repo: 'openshift/origin', team: 'trt', number, url: `https://github.com/openshift/origin/pull/${number}`, state, author: 'x' }]
+      const data = {
+        ...sampleData,
+        issues: [
+          { key: 'A-1', summary: 'none', status: 'New', agentState: 'new', processed: false, components: [], assignee: null },
+          { key: 'A-2', summary: 'closed', status: 'New', agentState: 'new', processed: false, components: [], assignee: null, linkedPrs: pr('CLOSED', 2) },
+          { key: 'A-3', summary: 'open', status: 'New', agentState: 'new', processed: false, components: [], assignee: null, linkedPrs: pr('OPEN', 3) },
+          { key: 'A-4', summary: 'merged', status: 'New', agentState: 'new', processed: false, components: [], assignee: null, linkedPrs: pr('MERGED', 4) }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      await headerButton(wrapper, 'PR Status').trigger('click')
+      expect(renderedKeys(wrapper)).toEqual(['A-3', 'A-4', 'A-2', 'A-1'])
+    })
+
+    it('sorts by Jira status alphabetically with blanks last', async () => {
+      const data = {
+        ...sampleData,
+        issues: [
+          { key: 'A-1', summary: 'a', status: null, agentState: 'other', processed: false, components: [], assignee: null },
+          { key: 'A-2', summary: 'b', status: 'Closed', agentState: 'closed', processed: false, components: [], assignee: null },
+          { key: 'A-3', summary: 'c', status: 'Assigned', agentState: 'new', processed: false, components: [], assignee: null }
+        ]
+      }
+      const wrapper = mount(AgentContent, { props: { agentData: data, loading: false, error: null } })
+      await headerButton(wrapper, 'Jira Status').trigger('click')
+      expect(renderedKeys(wrapper)).toEqual(['A-3', 'A-2', 'A-1'])
+    })
+
+    it('sorts the PR column by number of linked PRs', async () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      await headerButton(wrapper, 'PR').trigger('click')
+      // OCPBUGS-1 has two linked PRs, WINC-5 has one, the rest have none.
+      const keys = renderedKeys(wrapper)
+      expect(keys[0]).toBe('OCPBUGS-1')
+      expect(keys[1]).toBe('WINC-5')
+    })
+
+    it('marks the sorted column with aria-sort for assistive tech', async () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const keyHeader = () => wrapper.findAll('thead th')[0]
+      expect(keyHeader().attributes('aria-sort')).toBe('none')
+      await headerButton(wrapper, 'Key').trigger('click')
+      expect(keyHeader().attributes('aria-sort')).toBe('ascending')
+      await headerButton(wrapper, 'Key').trigger('click')
+      expect(keyHeader().attributes('aria-sort')).toBe('descending')
+    })
+
+    it('does not mutate the incoming issues array when sorting', async () => {
+      const issues = sampleData.issues.map(i => ({ ...i }))
+      const order = issues.map(i => i.key)
+      const wrapper = mount(AgentContent, {
+        props: { agentData: { ...sampleData, issues }, loading: false, error: null }
+      })
+      await headerButton(wrapper, 'Key').trigger('click')
+      expect(issues.map(i => i.key)).toEqual(order)
+    })
+
+    it('keeps sorting applied while a filter narrows the rows', async () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      await headerButton(wrapper, 'Key').trigger('click')
+      await wrapper.find('select[aria-label="Filter by Jira state"]').setValue('new')
+      const keys = renderedKeys(wrapper)
+      expect(keys).toEqual([...keys].sort((a, b) => {
+        const [pa, na] = a.split('-'); const [pb, nb] = b.split('-')
+        return pa === pb ? Number(na) - Number(nb) : pa.localeCompare(pb)
+      }))
+    })
+  })
+
+
+  describe('team repo tooltips', () => {
+    function teamButton(wrapper, label) {
+      return wrapper.findAll('button').find(b => b.text().includes(label))
+    }
+
+    it('lists a team\'s repos in a tooltip on its box', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const tip = teamButton(wrapper, 'MCO').find('[role="tooltip"]')
+      expect(tip.exists()).toBe(true)
+      expect(tip.text()).toContain('machine-config-operator')
+      expect(tip.text()).toContain('os')
+      expect(tip.text()).toContain('2 repos')
+    })
+
+    it('rolls every tracked repo up under All Teams', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const tip = teamButton(wrapper, 'All Teams').find('[role="tooltip"]')
+      // De-duplicated and sorted across all teams.
+      expect(tip.text()).toContain('cincinnati-graph-data')
+      expect(tip.text()).toContain('sippy')
+      expect(tip.text()).toContain('8 repos')
+    })
+
+    it('uses the singular label for a one-repo team', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const tip = teamButton(wrapper, 'Installer').find('[role="tooltip"]')
+      expect(tip.text()).toContain('1 repo')
+      expect(tip.text()).not.toContain('1 repos')
+    })
+
+    it('renders no tooltip for a team with no repos wired up', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      // edge-ecosystem has no repos in teamRepos.
+      const btn = teamButton(wrapper, 'Edge & Ecosystem')
+      expect(btn.find('[role="tooltip"]').exists()).toBe(false)
+      expect(btn.attributes('aria-describedby')).toBeUndefined()
+    })
+
+    it('points the box at its tooltip via aria-describedby', () => {
+      const wrapper = mount(AgentContent, {
+        props: { agentData: sampleData, loading: false, error: null }
+      })
+      const btn = teamButton(wrapper, 'MCO')
+      expect(btn.attributes('aria-describedby')).toBe('repos-mco')
+      expect(btn.find('[role="tooltip"]').attributes('id')).toBe('repos-mco')
+    })
+
+    it('renders without tooltips when the server sends no teamRepos', () => {
+      const { teamRepos, ...withoutRepos } = sampleData
+      expect(teamRepos).toBeTruthy()
+      const wrapper = mount(AgentContent, {
+        props: { agentData: withoutRepos, loading: false, error: null }
+      })
+      expect(wrapper.findAll('[role="tooltip"]')).toHaveLength(0)
+      // The boxes themselves still render.
+      expect(teamButton(wrapper, 'MCO').exists()).toBe(true)
+    })
   })
 
   it('shows empty state when no data', () => {

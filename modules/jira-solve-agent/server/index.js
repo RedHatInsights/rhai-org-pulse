@@ -5,7 +5,7 @@ const {
   dedupeAgentWork,
   fetchIssueStatusesByKeys
 } = require('./jira/fetcher');
-const { fetchAgentPrs, hydrateLinkedPrStates } = require('./github/prs');
+const { fetchAgentPrs, hydrateLinkedPrStates, TEAM_REPOS } = require('./github/prs');
 const { fetchLinkedPrsForKeys } = require('./jira/remote-links');
 
 /**
@@ -118,6 +118,7 @@ module.exports = function registerRoutes(router, context) {
       return res.json({
         fetchedAt: null,
         jiraHost: JIRA_HOST,
+        teamRepos: TEAM_REPOS,
         metrics: { totalIssues: 0, byState: {}, processedCount: 0, processedRate: 0 },
         issues: []
       });
@@ -128,6 +129,9 @@ module.exports = function registerRoutes(router, context) {
     res.json({
       fetchedAt: data.fetchedAt,
       jiraHost: JIRA_HOST,
+      // The repos each team tracks, so the client can show them on hover
+      // without duplicating (and drifting from) the server's mapping.
+      teamRepos: TEAM_REPOS,
       metrics,
       issues: data.issues
     });
