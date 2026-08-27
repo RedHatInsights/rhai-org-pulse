@@ -8,9 +8,14 @@ const { AGENT_REPOS, REPO_TEAM_BY_NAME } = require('../github/prs');
 
 const PR_URL_RE = /github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/i;
 
-// Jira rate limits are more generous than GitHub search (30/min). A short pause
-// between issues keeps us polite; the cap is a safety bound, not a silent drop.
-const LINKED_PR_THROTTLE_MS = 100;
+// Remote links are fetched one issue at a time, so the sweep is dominated by
+// round-trip latency rather than payload size. Running a bounded number of keys
+// concurrently turns a ~250ms-per-key serial walk into a handful of waves; the
+// shared Jira client already retries 429s, which is the real rate-limit guard.
+// `throttleMs` remains supported as a per-wave pause for callers that want to
+// slow the sweep down. The key cap is a safety bound, not a silent drop.
+const LINKED_PR_THROTTLE_MS = 0;
+const LINKED_PR_CONCURRENCY = 15;
 const LINKED_PR_MAX_KEYS = 500;
 
 function sleep(ms) {
@@ -19,22 +24,27 @@ function sleep(ms) {
 
 /**
  * Derive PR state from a GitHub-for-Jira remote link's status icon/title.
- * Falls back to OPEN when the integration omits status metadata.
+ * Returns null when Jira omits status metadata (display as Unknown in the UI).
  *
  * @param {object} link - Jira remote issue link object
- * @returns {string} "OPEN" | "MERGED" | "CLOSED"
+ * @returns {string|null} "OPEN" | "MERGED" | "CLOSED" | null
  */
 function prStateFromRemoteLink(link) {
   const status = link && link.object && link.object.status;
-  if (!status) return 'OPEN';
+  if (!status) return null;
 
-  const iconTitle = (status.icon && status.icon.title || '').toLowerCase();
-  if (iconTitle.includes('merged')) return 'MERGED';
-  if (iconTitle.includes('open')) return 'OPEN';
-  if (iconTitle.includes('declined') || iconTitle.includes('closed')) return 'CLOSED';
-  if (status.resolved) return 'CLOSED';
+  const iconTitle = (status.icon && status.icon.title || '').trim();
+  if (iconTitle) {
+    const lower = iconTitle.toLowerCase();
+    if (lower.includes('merged')) return 'MERGED';
+    if (lower.includes('open')) return 'OPEN';
+    if (lower.includes('declined') || lower.includes('closed')) return 'CLOSED';
+  }
 
-  return 'OPEN';
+  if (status.resolved === true) return 'CLOSED';
+  if (status.resolved === false && iconTitle) return 'OPEN';
+
+  return null;
 }
 
 /**
@@ -42,7 +52,7 @@ function prStateFromRemoteLink(link) {
  *
  * @param {object} link
  * @param {Set<string>} agentRepoSet
- * @returns {{repo:string,team:string|null,number:number,url:string,state:string,author:null}|null}
+ * @returns {{repo:string,team:string|null,number:number,url:string,state:string|null,author:null}|null}
  */
 function parseRemoteLinkPr(link, agentRepoSet) {
   const object = link && link.object;
@@ -60,7 +70,7 @@ function parseRemoteLinkPr(link, agentRepoSet) {
     team: REPO_TEAM_BY_NAME[repo] || null,
     number: Number(m[2]),
     url,
-    state: prStateFromRemoteLink(link),
+    state: null, // resolved from GitHub during refresh; UNKNOWN if unavailable
     author: null
   };
 }
@@ -84,15 +94,17 @@ async function fetchRemoteLinksForKey(jiraRequest, key) {
  * @param {string[]} keys
  * @param {object} [options]
  * @param {string[]} [options.repos] - agent repos to include (defaults to AGENT_REPOS)
- * @param {number} [options.throttleMs]
+ * @param {number} [options.throttleMs] - pause between concurrent waves
+ * @param {number} [options.concurrency]
  * @param {number} [options.maxKeys]
- * @returns {Promise<Map<string, Array<{repo:string,team:string|null,number:number,url:string,state:string,author:null}>>>}
+ * @returns {Promise<Map<string, Array<{repo:string,team:string|null,number:number,url:string,state:string|null,author:null}>>>}
  */
 async function fetchLinkedPrsForKeys(jiraRequest, keys, options = {}) {
   const byKey = new Map();
   const repos = options.repos || AGENT_REPOS;
   const agentRepoSet = new Set(repos);
   const throttleMs = options.throttleMs != null ? options.throttleMs : LINKED_PR_THROTTLE_MS;
+  const concurrency = Math.max(1, options.concurrency != null ? options.concurrency : LINKED_PR_CONCURRENCY);
   const maxKeys = options.maxKeys != null ? options.maxKeys : LINKED_PR_MAX_KEYS;
 
   const distinct = [...new Set((keys || []).filter(Boolean))];
@@ -104,8 +116,9 @@ async function fetchLinkedPrsForKeys(jiraRequest, keys, options = {}) {
     );
   }
 
-  for (let i = 0; i < targets.length; i++) {
-    const key = targets[i];
+  // One key's worth of work. A failure is logged and skipped so a single bad
+  // ticket never aborts the sweep, matching the previous serial behaviour.
+  async function collectKey(key) {
     try {
       const links = await fetchRemoteLinksForKey(jiraRequest, key);
       const prs = [];
@@ -120,7 +133,12 @@ async function fetchLinkedPrsForKeys(jiraRequest, keys, options = {}) {
     } catch (err) {
       console.warn(`[jira-solve-agent] Remote-link fetch failed for ${key}: ${err.message}`);
     }
-    if (throttleMs > 0 && i < targets.length - 1) {
+  }
+
+  for (let i = 0; i < targets.length; i += concurrency) {
+    const wave = targets.slice(i, i + concurrency);
+    await Promise.all(wave.map(collectKey));
+    if (throttleMs > 0 && i + concurrency < targets.length) {
       await sleep(throttleMs);
     }
   }
@@ -134,5 +152,6 @@ module.exports = {
   parseRemoteLinkPr,
   prStateFromRemoteLink,
   LINKED_PR_THROTTLE_MS,
+  LINKED_PR_CONCURRENCY,
   LINKED_PR_MAX_KEYS
 };

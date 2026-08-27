@@ -17,7 +17,17 @@ const fetch = require('node-fetch');
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 const GITHUB_REST_URL = 'https://api.github.com';
 const BOT_LOGIN = 'redhat-chai-bot';
-const HYDRATE_CONCURRENCY = 10;
+
+// Hydration is latency-bound single-object GETs, so it runs as a rolling pool
+// of workers rather than fixed batches — no worker idles waiting on a slow peer.
+const HYDRATE_CONCURRENCY = 30;
+const HYDRATE_MAX_RETRIES = 3;
+const HYDRATE_BACKOFF_BASE_MS = 1000;
+const HYDRATE_MAX_BACKOFF_MS = 30000;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // Repo -> team key. Team keys match the client's TEAMS list in AgentContent.vue.
 // This map doubles as the fetch list and the team-attribution filter.
@@ -135,26 +145,33 @@ async function fetchAgentPrs(options = {}) {
     throw new Error('GITHUB_TOKEN is not configured');
   }
 
+  // Each repo is an independent paginated search, so they run concurrently.
+  // `allSettled` keeps the per-repo error isolation of the original serial
+  // loop: one repo failing degrades that repo only, never the whole fetch.
+  const settled = await Promise.allSettled(
+    REPO_TEAMS.map(({ repo }) => fetchRepoPrs(repo, token))
+  );
+
   const all = [];
-  for (const { repo, team } of REPO_TEAMS) {
-    try {
-      const prs = await fetchRepoPrs(repo, token);
-      for (const pr of prs) {
-        all.push({
-          repo,
-          team,
-          number: pr.number,
-          title: pr.title,
-          url: pr.url,
-          state: pr.state,
-          createdAt: pr.createdAt,
-          jiraKey: extractJiraKey(pr.title)
-        });
-      }
-    } catch (err) {
-      console.warn(`[jira-solve-agent] Failed to fetch PRs for ${repo}: ${err.message}`);
+  settled.forEach((outcome, i) => {
+    const { repo, team } = REPO_TEAMS[i];
+    if (outcome.status === 'rejected') {
+      console.warn(`[jira-solve-agent] Failed to fetch PRs for ${repo}: ${outcome.reason.message}`);
+      return;
     }
-  }
+    for (const pr of outcome.value) {
+      all.push({
+        repo,
+        team,
+        number: pr.number,
+        title: pr.title,
+        url: pr.url,
+        state: pr.state,
+        createdAt: pr.createdAt,
+        jiraKey: extractJiraKey(pr.title)
+      });
+    }
+  });
 
   return all;
 }
@@ -168,45 +185,110 @@ const REPO_TEAM_BY_NAME = REPO_TEAMS.reduce((acc, rt) => {
 }, {});
 
 /**
- * Map a GitHub REST pull object to OPEN | MERGED | CLOSED.
+ * Map a GitHub REST pull object to OPEN | MERGED | CLOSED | UNKNOWN.
  * @param {{ merged?: boolean, state?: string }} data
  * @returns {string}
  */
 function prStateFromRestPull(data) {
-  if (data && data.merged) return 'MERGED';
-  if (data && data.state === 'open') return 'OPEN';
-  return 'CLOSED';
+  if (!data) return 'UNKNOWN';
+  if (data.merged) return 'MERGED';
+  if (data.state === 'open') return 'OPEN';
+  if (data.state === 'closed') return 'CLOSED';
+  return 'UNKNOWN';
+}
+
+/**
+ * Seconds to wait before retrying a rate-limited GitHub response. Honours
+ * `retry-after`, then the primary-rate-limit `x-ratelimit-reset` epoch, and
+ * falls back to exponential backoff.
+ *
+ * @param {object} response
+ * @param {number} attempt - zero-based retry attempt
+ * @param {number} [baseMs] - backoff base, overridable so tests need not sleep
+ * @returns {number} delay in milliseconds
+ */
+function rateLimitDelayMs(response, attempt, baseMs = HYDRATE_BACKOFF_BASE_MS) {
+  const header = (name) => (response.headers && typeof response.headers.get === 'function')
+    ? response.headers.get(name)
+    : null;
+
+  const retryAfter = parseInt(header('retry-after'), 10);
+  if (!isNaN(retryAfter) && retryAfter > 0) return retryAfter * 1000;
+
+  const reset = parseInt(header('x-ratelimit-reset'), 10);
+  if (!isNaN(reset) && reset > 0) {
+    const delta = reset * 1000 - Date.now();
+    if (delta > 0) return Math.min(delta, HYDRATE_MAX_BACKOFF_MS);
+  }
+
+  return Math.min(Math.pow(2, attempt + 1) * baseMs, HYDRATE_MAX_BACKOFF_MS);
+}
+
+/**
+ * True when a GitHub response indicates rate limiting: an explicit 429, or the
+ * 403 GitHub returns when the primary rate limit is exhausted.
+ *
+ * @param {object} response
+ * @returns {boolean}
+ */
+function isRateLimited(response) {
+  if (response.status === 429) return true;
+  if (response.status !== 403) return false;
+  const remaining = response.headers && typeof response.headers.get === 'function'
+    ? response.headers.get('x-ratelimit-remaining')
+    : null;
+  return remaining === '0';
 }
 
 /**
  * Fetch live PR state from GitHub REST (merged flag distinguishes MERGED vs CLOSED).
  *
+ * Retries on rate limiting so that raising hydration concurrency cannot quietly
+ * degrade PR state to UNKNOWN; other errors throw on the first attempt.
+ *
  * @param {string} repo - "owner/name"
  * @param {number} number
  * @param {string} token
  * @param {Function} [fetchImpl]
+ * @param {object} [options]
+ * @param {number} [options.backoffBaseMs]
  * @returns {Promise<string>}
  */
-async function hydratePullRequestState(repo, number, token, fetchImpl = fetch) {
+async function hydratePullRequestState(repo, number, token, fetchImpl = fetch, options = {}) {
   const parts = repo.split('/');
   if (parts.length !== 2) {
     throw new Error(`invalid repo: ${repo}`);
   }
   const [owner, name] = parts;
-  const response = await fetchImpl(
-    `${GITHUB_REST_URL}/repos/${owner}/${name}/pulls/${number}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'jira-solve-agent'
+
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetchImpl(
+      `${GITHUB_REST_URL}/repos/${owner}/${name}/pulls/${number}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'jira-solve-agent'
+        }
       }
+    );
+
+    if (response.ok) {
+      return prStateFromRestPull(await response.json());
     }
-  );
-  if (!response.ok) {
+
+    if (isRateLimited(response) && attempt < HYDRATE_MAX_RETRIES) {
+      const delay = rateLimitDelayMs(response, attempt, options.backoffBaseMs);
+      console.warn(
+        `[jira-solve-agent] GitHub rate limited on ${repo}#${number}, ` +
+        `retrying in ${Math.round(delay / 1000)}s (attempt ${attempt + 1}/${HYDRATE_MAX_RETRIES})`
+      );
+      await sleep(delay);
+      continue;
+    }
+
     throw new Error(`GitHub PR API error: ${response.status} ${response.statusText}`);
   }
-  return prStateFromRestPull(await response.json());
 }
 
 /**
@@ -217,32 +299,69 @@ async function hydratePullRequestState(repo, number, token, fetchImpl = fetch) {
  * @param {object} options
  * @param {string} options.token - GitHub API token
  * @param {Function} [options.fetchImpl]
+ * @param {number} [options.concurrency]
  */
 async function hydrateLinkedPrStates(linkedByKey, options = {}) {
-  const token = options.token;
-  if (!token || !linkedByKey || linkedByKey.size === 0) return;
+  if (!linkedByKey || linkedByKey.size === 0) return;
 
+  const token = options.token;
   const fetchImpl = options.fetchImpl || fetch;
-  const unique = new Map();
+  const concurrency = Math.max(
+    1,
+    options.concurrency != null ? options.concurrency : HYDRATE_CONCURRENCY
+  );
+
+  // A PR linked from several Jira issues appears once per key as a separate
+  // object. Group every copy under its url so one fetch updates all of them —
+  // keeping only the last copy would leave the rest stuck at their initial
+  // state and render as Unknown in the UI.
+  const byUrl = new Map();
   for (const prs of linkedByKey.values()) {
     for (const pr of prs) {
-      if (pr && pr.url) unique.set(pr.url, pr);
+      if (!pr || !pr.url) continue;
+      const copies = byUrl.get(pr.url);
+      if (copies) copies.push(pr);
+      else byUrl.set(pr.url, [pr]);
     }
   }
 
-  const list = [...unique.values()];
-  for (let i = 0; i < list.length; i += HYDRATE_CONCURRENCY) {
-    const batch = list.slice(i, i + HYDRATE_CONCURRENCY);
-    await Promise.all(batch.map(async (pr) => {
+  const list = [...byUrl.values()];
+  if (list.length === 0) return;
+
+  const applyState = (copies, state) => {
+    for (const pr of copies) pr.state = state;
+  };
+
+  if (!token) {
+    for (const copies of list) applyState(copies, 'UNKNOWN');
+    return;
+  }
+
+  // Rolling pool: workers pull the next index off a shared cursor, so a slow
+  // call never blocks the others and dispatch order still follows `list`.
+  let cursor = 0;
+  async function worker() {
+    while (cursor < list.length) {
+      const copies = list[cursor++];
+      const { repo, number } = copies[0];
       try {
-        pr.state = await hydratePullRequestState(pr.repo, pr.number, token, fetchImpl);
+        applyState(copies, await hydratePullRequestState(repo, number, token, fetchImpl, {
+          backoffBaseMs: options.backoffBaseMs
+        }));
       } catch (err) {
         console.warn(
-          `[jira-solve-agent] Failed to hydrate PR state for ${pr.repo}#${pr.number}: ${err.message}`
+          `[jira-solve-agent] Failed to hydrate PR state for ${repo}#${number}: ${err.message}`
         );
+        applyState(copies, 'UNKNOWN');
       }
-    }));
+    }
   }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, list.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
 }
 
 module.exports = {
@@ -255,5 +374,6 @@ module.exports = {
   REPO_TEAMS,
   AGENT_REPOS,
   REPO_TEAM_BY_NAME,
-  BOT_LOGIN
+  BOT_LOGIN,
+  HYDRATE_CONCURRENCY
 };

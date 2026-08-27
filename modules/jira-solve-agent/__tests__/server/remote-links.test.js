@@ -52,7 +52,7 @@ describe('parseRemoteLinkPr', () => {
       team: 'trt',
       number: 3452,
       url: 'https://github.com/openshift/sippy/pull/3452',
-      state: 'OPEN',
+      state: null,
       author: null
     })
   })
@@ -94,7 +94,7 @@ describe('fetchLinkedPrsForKeys', () => {
 
     expect(jiraRequest).toHaveBeenCalledTimes(2)
     expect(m.get('TRT-1')[0].number).toBe(1)
-    expect(m.get('TRT-2')[0].state).toBe('CLOSED')
+    expect(m.get('TRT-2')[0].state).toBe(null)
   })
 
   it('de-duplicates keys and skips falsy values', async () => {
@@ -140,5 +140,41 @@ describe('fetchLinkedPrsForKeys', () => {
     ])
     const m = await fetchLinkedPrsForKeys(jiraRequest, ['OCPBUGS-1'], { throttleMs: 0 })
     expect(m.get('OCPBUGS-1')).toHaveLength(1)
+  })
+})
+
+describe('fetchLinkedPrsForKeys concurrency', () => {
+  it('fetches keys concurrently in bounded waves', async () => {
+    let inFlight = 0
+    let peak = 0
+    const jiraRequest = vi.fn().mockImplementation(async () => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise(r => setTimeout(r, 5))
+      inFlight--
+      return []
+    })
+
+    const keys = Array.from({ length: 10 }, (_, i) => `TRT-${i + 1}`)
+    await fetchLinkedPrsForKeys(jiraRequest, keys, { concurrency: 4 })
+
+    expect(jiraRequest).toHaveBeenCalledTimes(10)
+    expect(peak).toBeGreaterThan(1)
+    expect(peak).toBeLessThanOrEqual(4)
+  })
+
+  it('still collects results from other keys when one rejects mid-wave', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const jiraRequest = vi.fn().mockImplementation(async (path) => {
+      if (path.includes('TRT-2')) throw new Error('network boom')
+      return [remoteLink({ url: 'https://github.com/openshift/origin/pull/5' })]
+    })
+
+    const m = await fetchLinkedPrsForKeys(jiraRequest, ['TRT-1', 'TRT-2', 'TRT-3'], { concurrency: 3 })
+
+    expect(m.has('TRT-1')).toBe(true)
+    expect(m.has('TRT-2')).toBe(false)
+    expect(m.has('TRT-3')).toBe(true)
+    warn.mockRestore()
   })
 })

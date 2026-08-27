@@ -150,7 +150,7 @@ describe('runRefresh linked PRs via Jira remote links', () => {
     expect(remoteLinksModule.fetchLinkedPrsForKeys.mock.calls[0][1]).toEqual(['CNTRLPLANE-507']);
   });
 
-  it('fetches linked PRs without bot PR discovery when there is no GitHub token', async () => {
+  it('hydrates linked PR state from GitHub when a token is configured', async () => {
     fetcher.fetchAgentData.mockResolvedValue([{ key: 'CNTRLPLANE-507', status: 'Closed' }]);
 
     const { store, runRefresh } = setup({ token: '' });
@@ -158,7 +158,7 @@ describe('runRefresh linked PRs via Jira remote links', () => {
 
     expect(remoteLinksModule.fetchLinkedPrsForKeys).toHaveBeenCalled();
     expect(prsModule.fetchAgentPrs).not.toHaveBeenCalled();
-    expect(prsModule.hydrateLinkedPrStates).not.toHaveBeenCalled();
+    expect(prsModule.hydrateLinkedPrStates).toHaveBeenCalled();
     expect(store['jira-solve-agent/data.json'].issues).toHaveLength(1);
   });
 });

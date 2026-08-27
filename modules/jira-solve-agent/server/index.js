@@ -196,12 +196,10 @@ module.exports = function registerRoutes(router, context) {
     let linkedByKey = new Map();
     try {
       linkedByKey = await fetchLinkedPrsForKeys(jiraRequest, keysForLinkedPrs);
-      if (GITHUB_TOKEN && linkedByKey.size > 0) {
-        try {
-          await hydrateLinkedPrStates(linkedByKey, { token: GITHUB_TOKEN });
-        } catch (err) {
-          console.warn(`[jira-solve-agent] Linked PR state hydration failed: ${err.message}`);
-        }
+      try {
+        await hydrateLinkedPrStates(linkedByKey, { token: GITHUB_TOKEN || '' });
+      } catch (err) {
+        console.warn(`[jira-solve-agent] Linked PR state hydration failed: ${err.message}`);
       }
       for (const issue of jiraIssues) {
         const linked = linkedByKey.get(issue.key);
