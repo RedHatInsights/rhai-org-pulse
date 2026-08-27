@@ -16,7 +16,7 @@
 
     <template v-else>
       <!-- Team selector with inline stats -->
-      <div class="px-6 pt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div class="px-6 pt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         <button
           v-for="team in teamOptions"
           :key="team.key"
@@ -41,8 +41,8 @@
             </div>
             <div :class="['w-px h-8', selectedTeam === team.key ? 'bg-white/20' : 'bg-gray-200 dark:bg-gray-700']"></div>
             <div class="text-center">
-              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-gray-500 dark:text-gray-400']">{{ teamStats(team.key).closed }}</div>
-              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">closed</div>
+              <div :class="['text-xl font-bold', selectedTeam === team.key ? 'text-white' : 'text-purple-600 dark:text-purple-400']">{{ teamStats(team.key).merged }}</div>
+              <div :class="['text-[10px] uppercase tracking-wider', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">merged</div>
             </div>
           </div>
         </button>
@@ -122,28 +122,25 @@
                 <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                   <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Key</th>
                   <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Summary</th>
-                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Component</th>
-                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Status</th>
-                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Agent State</th>
-                  <th class="px-4 py-2 text-center text-gray-500 dark:text-gray-400 font-medium">Processed</th>
-                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Priority</th>
-                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Assignee</th>
-                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Updated</th>
+                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">PR Status</th>
+                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">PR</th>
+                  <th class="px-4 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Jira Status</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="filteredIssues.length === 0">
-                  <td colspan="9" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                  <td colspan="5" class="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
                     No issues match your filters.
                   </td>
                 </tr>
                 <tr
                   v-for="issue in filteredIssues"
-                  :key="issue.key"
+                  :key="issue.key + (issue.prUrl || '')"
                   class="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <td class="px-4 py-2">
                     <a
+                      v-if="issue.key !== 'NO-JIRA'"
                       :href="`${jiraHost}/browse/${issue.key}`"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -151,37 +148,42 @@
                     >
                       {{ issue.key }}
                     </a>
+                    <span v-else class="text-gray-400 dark:text-gray-500 font-medium">{{ issue.key }}</span>
                   </td>
                   <td class="px-4 py-2 text-gray-900 dark:text-gray-100 max-w-md truncate">
                     {{ issue.summary }}
                   </td>
-                  <td class="px-4 py-2 text-gray-600 dark:text-gray-300 text-xs">
-                    {{ issue.components.join(', ') || '—' }}
-                  </td>
-                  <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
-                    {{ issue.status }}
-                  </td>
                   <td class="px-4 py-2">
-                    <span :class="stateClasses(issue.agentState)">
-                      {{ stateLabel(issue.agentState) }}
-                    </span>
+                    <a
+                      v-if="prLink(issue)"
+                      :href="prLink(issue)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      :class="prStatusClasses(prStatus(issue))"
+                      class="hover:underline"
+                    >
+                      {{ prStatusLabel(prStatus(issue)) }}
+                    </a>
+                    <span v-else class="text-gray-400 dark:text-gray-500">—</span>
                   </td>
-                  <td class="px-4 py-2 text-center">
-                    <span v-if="issue.processed" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                      Yes
-                    </span>
-                    <span v-else class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                      No
-                    </span>
+                  <td class="px-4 py-2 align-top">
+                    <template v-if="prList(issue).length">
+                      <div v-for="pr in prList(issue)" :key="pr.url" class="whitespace-nowrap">
+                        <a
+                          :href="pr.url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          :class="prStateTextClasses(pr.state)"
+                          class="hover:underline"
+                        >
+                          {{ pr.label }}
+                        </a>
+                      </div>
+                    </template>
+                    <span v-else class="text-gray-400 dark:text-gray-500">—</span>
                   </td>
                   <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
-                    {{ issue.priority }}
-                  </td>
-                  <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
-                    {{ issue.assignee || '—' }}
-                  </td>
-                  <td class="px-4 py-2 text-gray-400 dark:text-gray-500 text-xs">
-                    {{ formatDate(issue.updated) }}
+                    {{ issue.status || '—' }}
                   </td>
                 </tr>
               </tbody>
@@ -214,6 +216,9 @@ const TEAMS = [
   { key: 'hypershift', label: 'HyperShift', components: ['HyperShift', 'Hosted Control Planes'] },
   { key: 'installer', label: 'Installer', components: ['Installer / openshift-installer'] },
   { key: 'trt', label: 'TRT', projectPrefix: 'TRT' },
+  { key: 'wmco', label: 'Windows Containers', components: ['Windows Containers'], projectPrefixes: ['WINC'] },
+  { key: 'mco', label: 'MCO', components: ['Machine Config Operator'], projectPrefixes: ['MCO'] },
+  { key: 'ingress', label: 'Ingress Operator', components: ['Networking / router'], projectPrefixes: ['NE'] },
   { key: 'edge-ecosystem', label: 'Edge & Ecosystem', components: [] },
 ];
 
@@ -229,14 +234,28 @@ const teamOptions = computed(() => [
 
 const jiraHost = computed(() => props.agentData?.jiraHost || 'https://redhat.atlassian.net');
 
+function issueMatchesTeam(issue, team) {
+  // Rows sourced from a chai-bot PR carry an authoritative team (derived from
+  // the PR's repo). Trust it directly — their Jira key prefix/component often
+  // won't map to the repo's team (e.g. an OCPBUGS-* PR in the ingress repo).
+  if (issue.team) {
+    return issue.team === team.key;
+  }
+  const prefixes = team.projectPrefixes || (team.projectPrefix ? [team.projectPrefix] : []);
+  if (prefixes.some(prefix => issue.key.startsWith(prefix + '-'))) {
+    return true;
+  }
+  if (team.components?.length && issue.components.some(c => team.components.includes(c))) {
+    return true;
+  }
+  return false;
+}
+
 function filterByTeam(issues, teamKey) {
   if (teamKey === 'all') return issues;
   const team = TEAMS.find(t => t.key === teamKey);
   if (!team) return issues;
-  if (team.projectPrefix) {
-    return issues.filter(i => i.key.startsWith(team.projectPrefix + '-'));
-  }
-  return issues.filter(i => i.components.some(c => team.components.includes(c)));
+  return issues.filter(i => issueMatchesTeam(i, team));
 }
 
 const teamFilteredIssues = computed(() => {
@@ -245,15 +264,17 @@ const teamFilteredIssues = computed(() => {
 });
 
 function teamStats(teamKey) {
-  if (!props.agentData?.issues) return { total: 0, closed: 0, inProgress: 0 };
+  if (!props.agentData?.issues) return { total: 0, inProgress: 0, merged: 0 };
   const issues = filterByTeam(props.agentData.issues, teamKey);
-  let closed = 0;
   let inProgress = 0;
+  let merged = 0;
   for (const i of issues) {
-    if (i.agentState === 'closed') closed++;
     if (i.agentState === 'in-progress') inProgress++;
+    // "merged" reflects the PR outcome (a real GitHub merge), independent of the
+    // Jira status: any row whose rolled-up PR state is MERGED.
+    if (prStatus(i) === 'MERGED') merged++;
   }
-  return { total: issues.length, closed, inProgress };
+  return { total: issues.length, inProgress, merged };
 }
 
 function recomputeMetrics(issues) {
@@ -301,28 +322,86 @@ const filteredIssues = computed(() => {
   return issues;
 });
 
-const STATE_LABELS = {
-  'new': 'New',
-  'ready-to-solve': 'Ready to Solve',
-  'in-progress': 'In Progress',
-  'closed': 'Closed',
-  'other': 'Other'
-};
-
-const STATE_CLASSES = {
-  'new': 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  'ready-to-solve': 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-  'in-progress': 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-  'closed': 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-  'other': 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-500'
-};
-
-function stateLabel(state) {
-  return STATE_LABELS[state] || state;
+// PR status shown in the table. A chai-bot row carries its PR's state directly
+// (prState); a Jira issue row derives a single state from its linkedPrs
+// (any open → OPEN, else any merged → MERGED, else CLOSED); a plain issue has
+// no PR and returns null.
+function prStatus(issue) {
+  if (issue.prState) return issue.prState.toUpperCase();
+  const linked = issue.linkedPrs;
+  if (Array.isArray(linked) && linked.length) {
+    const states = linked.map(p => (p.state || '').toUpperCase());
+    if (states.includes('OPEN')) return 'OPEN';
+    if (states.includes('MERGED')) return 'MERGED';
+    return 'CLOSED';
+  }
+  return null;
 }
 
-function stateClasses(state) {
-  return STATE_CLASSES[state] || STATE_CLASSES.other;
+// The PR to link the status badge to: the bot PR for chai-bot rows, otherwise
+// the first linked PR for Jira issue rows.
+function prLink(issue) {
+  if (issue.prUrl) return issue.prUrl;
+  const linked = issue.linkedPrs;
+  if (Array.isArray(linked) && linked.length && linked[0].url) return linked[0].url;
+  return null;
+}
+
+// Compact label for a single PR link: "repo#number" parsed from the PR URL
+// (e.g. cluster-ingress-operator#1483), falling back to "PR ↗" when the URL
+// doesn't match the expected GitHub shape.
+const PR_URL_RE = /github\.com\/[^/]+\/([^/]+)\/pull\/(\d+)/;
+
+function prLabelForUrl(url) {
+  if (!url) return '';
+  const m = url.match(PR_URL_RE);
+  if (m) return `${m[1]}#${m[2]}`;
+  return 'PR ↗';
+}
+
+// Every PR to show in the PR column for a row: the single bot PR for chai-bot
+// rows, otherwise all linkedPrs for a Jira issue row. Each entry is
+// { url, state, label } ready to render.
+function prList(issue) {
+  if (issue.prUrl) {
+    return [{ url: issue.prUrl, state: (issue.prState || '').toUpperCase(), label: prLabelForUrl(issue.prUrl) }];
+  }
+  const linked = issue.linkedPrs;
+  if (Array.isArray(linked) && linked.length) {
+    return linked
+      .filter(p => p && p.url)
+      .map(p => ({ url: p.url, state: (p.state || '').toUpperCase(), label: prLabelForUrl(p.url) }));
+  }
+  return [];
+}
+
+const PR_STATUS_LABELS = { OPEN: 'Open', MERGED: 'Merged', CLOSED: 'Closed' };
+
+function prStatusLabel(state) {
+  if (!state) return '—';
+  return PR_STATUS_LABELS[state] || state;
+}
+
+const PR_STATUS_CLASSES = {
+  OPEN: 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  MERGED: 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+  CLOSED: 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+};
+
+function prStatusClasses(state) {
+  return PR_STATUS_CLASSES[state] || PR_STATUS_CLASSES.CLOSED;
+}
+
+// Per-PR link color in the PR column, so each PR's state is legible at a glance
+// without a full badge per line (rows can carry many PRs).
+const PR_STATE_TEXT_CLASSES = {
+  OPEN: 'text-green-700 dark:text-green-400',
+  MERGED: 'text-purple-700 dark:text-purple-400',
+  CLOSED: 'text-gray-500 dark:text-gray-400'
+};
+
+function prStateTextClasses(state) {
+  return PR_STATE_TEXT_CLASSES[state] || 'text-primary-600 dark:text-primary-400';
 }
 
 function formatDate(iso) {
