@@ -23,7 +23,7 @@ jobs:
       enabled-modules: ${{ steps.build-matrix.outputs.modules }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: dorny/paths-filter@v4
         id: filter
@@ -87,7 +87,7 @@ jobs:
         module: ${{ fromJson(needs.detect-changes.outputs.enabled-modules) }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run Module Test
         uses: ./.github/actions/test-org-pulse-module
