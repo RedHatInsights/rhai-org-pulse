@@ -1,3 +1,13 @@
+const { createJiraClient } = require('../../../shared/server/jira');
+const {
+  fetchAgentData,
+  computeMetrics,
+  dedupeAgentWork,
+  fetchIssueStatusesByKeys
+} = require('./jira/fetcher');
+const { fetchAgentPrs, hydrateLinkedPrStates, TEAM_REPOS } = require('./github/prs');
+const { fetchLinkedPrsForKeys } = require('./jira/remote-links');
+
 /**
  * @param {import('express').Router} router
  * @param {import('@shared/server/module-context').ModuleContext} context
@@ -13,7 +23,6 @@ module.exports = function registerRoutes(router, context) {
 
   const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
-  const { createJiraClient } = require('../../../shared/server/jira');
   const jira = createJiraClient({
     email: (context.secrets && context.secrets.JIRA_EMAIL) || '',
     token: (context.secrets && context.secrets.JIRA_TOKEN) || '',
@@ -21,7 +30,77 @@ module.exports = function registerRoutes(router, context) {
   });
   const { jiraRequest, JIRA_HOST } = jira;
 
-  const { fetchAgentData, computeMetrics } = require('./jira/fetcher');
+  const GITHUB_TOKEN = (context.secrets && context.secrets.GITHUB_TOKEN) || '';
+
+  // Placeholder key for a bot PR that carries no Jira reference at all.
+  const NO_JIRA_KEY = 'NO-JIRA';
+
+  // Map a bot PR's GitHub state to the app's agent-state vocabulary, used only
+  // for NO-JIRA rows (which have no Jira ticket to read a status from).
+  function agentStateFromPrState(state) {
+    const s = (state || '').toUpperCase();
+    if (s === 'MERGED' || s === 'CLOSED') return 'closed';
+    if (s === 'OPEN') return 'in-progress';
+    return 'other';
+  }
+
+  // Build a synthetic issue row for a net-new-keyed bot PR (a Jira ticket that
+  // exists but lacks the issue-for-agent label). Status/assignee come from a live
+  // Jira lookup so the row reflects the real ticket state.
+  function rowFromKeyedPr(pr, statusByKey) {
+    const info = statusByKey.get(pr.jiraKey) || {};
+    const status = info.status || 'Unknown';
+    return {
+      key: pr.jiraKey,
+      summary: pr.title || pr.jiraKey,
+      status,
+      issueType: 'Unknown',
+      priority: 'None',
+      created: pr.createdAt || null,
+      updated: pr.createdAt || null,
+      labels: [],
+      components: [],
+      assignee: info.assignee || null,
+      agentState: classifyPrRowState(status),
+      processed: false,
+      source: 'chai-bot-pr',
+      prUrl: pr.url,
+      prState: pr.state || null,
+      team: pr.team || null
+    };
+  }
+
+  // Build a synthetic NO-JIRA row for a bot PR with no Jira key at all.
+  function rowFromNoKeyPr(pr) {
+    return {
+      key: NO_JIRA_KEY,
+      summary: pr.title || NO_JIRA_KEY,
+      status: null, // no Jira ticket to read a status from
+      issueType: 'Unknown',
+      priority: 'None',
+      created: pr.createdAt || null,
+      updated: pr.createdAt || null,
+      labels: [],
+      components: [],
+      assignee: null,
+      agentState: agentStateFromPrState(pr.state),
+      processed: false,
+      source: 'chai-bot-pr',
+      prUrl: pr.url,
+      prState: pr.state || null,
+      team: pr.team || null
+    };
+  }
+
+  // Reuse the fetcher's status-category classification for a live Jira status
+  // name. We only have the status name here (no category), so map common names.
+  function classifyPrRowState(statusName) {
+    const s = (statusName || '').toLowerCase();
+    if (['closed', 'done', 'resolved', 'verified'].includes(s)) return 'closed';
+    if (['in progress', 'code review', 'review', 'on_dev', 'on dev'].includes(s)) return 'in-progress';
+    if (['new', 'to do', 'open', 'backlog'].includes(s)) return 'new';
+    return 'other';
+  }
 
   /**
    * @openapi
@@ -39,6 +118,7 @@ module.exports = function registerRoutes(router, context) {
       return res.json({
         fetchedAt: null,
         jiraHost: JIRA_HOST,
+        teamRepos: TEAM_REPOS,
         metrics: { totalIssues: 0, byState: {}, processedCount: 0, processedRate: 0 },
         issues: []
       });
@@ -49,6 +129,9 @@ module.exports = function registerRoutes(router, context) {
     res.json({
       fetchedAt: data.fetchedAt,
       jiraHost: JIRA_HOST,
+      // The repos each team tracks, so the client can show them on hover
+      // without duplicating (and drifting from) the server's mapping.
+      teamRepos: TEAM_REPOS,
       metrics,
       issues: data.issues
     });
@@ -91,15 +174,85 @@ module.exports = function registerRoutes(router, context) {
   async function runRefresh() {
     if (DEMO_MODE) return;
 
-    const issues = await fetchAgentData(jiraRequest);
+    // 1. Jira issues carrying the issue-for-agent label.
+    const jiraIssues = await fetchAgentData(jiraRequest);
+
+    // 2. PRs opened by the bot across the wired-up repos (all states).
+    let botPrs = [];
+    if (GITHUB_TOKEN) {
+      try {
+        botPrs = await fetchAgentPrs({ token: GITHUB_TOKEN });
+      } catch (err) {
+        console.warn(`[jira-solve-agent] Failed to fetch bot PRs: ${err.message}`);
+      }
+    }
+
+    // 3. De-duplicate the bot PRs against the tracked Jira issues. Overlapping
+    //    PRs are already represented by their Jira issue; net-new-keyed and
+    //    no-key PRs each become their own row that counts toward the total.
+    const dedup = dedupeAgentWork(jiraIssues, botPrs);
+
+    // 4. Linked PRs from Jira remote issue links (GitHub-for-Jira integration).
+    const keysForLinkedPrs = [
+      ...jiraIssues.map(i => i.key),
+      ...dedup.netNewKeyedPrs.map(pr => pr.jiraKey).filter(Boolean)
+    ];
+    let linkedByKey = new Map();
+    try {
+      linkedByKey = await fetchLinkedPrsForKeys(jiraRequest, keysForLinkedPrs);
+      try {
+        await hydrateLinkedPrStates(linkedByKey, { token: GITHUB_TOKEN || '' });
+      } catch (err) {
+        console.warn(`[jira-solve-agent] Linked PR state hydration failed: ${err.message}`);
+      }
+      for (const issue of jiraIssues) {
+        const linked = linkedByKey.get(issue.key);
+        if (linked && linked.length) issue.linkedPrs = linked;
+      }
+    } catch (err) {
+      console.warn(`[jira-solve-agent] Remote-link sweep failed: ${err.message}`);
+    }
+
+    // 5. For net-new-keyed PRs, look up the live Jira status so the row is
+    //    accurate. NO-JIRA rows need no lookup.
+    let statusByKey = new Map();
+    const netNewKeys = dedup.netNewKeyedPrs.map(pr => pr.jiraKey);
+    if (netNewKeys.length) {
+      try {
+        statusByKey = await fetchIssueStatusesByKeys(jiraRequest, netNewKeys);
+      } catch (err) {
+        console.warn(`[jira-solve-agent] Failed to fetch statuses for net-new PR keys: ${err.message}`);
+      }
+    }
+
+    const keyedRows = dedup.netNewKeyedPrs.map(pr => rowFromKeyedPr(pr, statusByKey));
+    for (const row of keyedRows) {
+      const linked = linkedByKey.get(row.key);
+      if (linked && linked.length) row.linkedPrs = linked;
+    }
+    // One NO-JIRA row per keyless bot PR, de-duplicated by PR url.
+    const seenNoKeyUrls = new Set();
+    const noKeyRows = [];
+    for (const pr of dedup.noKeyPrs) {
+      if (pr.url && seenNoKeyUrls.has(pr.url)) continue;
+      if (pr.url) seenNoKeyUrls.add(pr.url);
+      noKeyRows.push(rowFromNoKeyPr(pr));
+    }
+
+    const issues = [...jiraIssues, ...keyedRows, ...noKeyRows];
+
     writeToStorage('jira-solve-agent/data.json', {
       fetchedAt: new Date().toISOString(),
-      issues
+      issues,
+      prs: botPrs,
+      combined: dedup.combined
     });
 
     refreshState.lastResult = {
       status: 'ok',
       issueCount: issues.length,
+      prCount: botPrs.length,
+      combined: dedup.combined,
       completedAt: new Date().toISOString()
     };
   }
