@@ -1,5 +1,5 @@
 {
-  "name": "OpenShift Jira Solve Agent",
+  "name": "Agentic Bug Fixes",
   "slug": "jira-solve-agent",
   "description": "Track the progress and adoption of OpenShift Jira Solve Agent",
   "icon": "bot",
@@ -7,7 +7,7 @@
   "client": {
     "entry": "./client/index.js",
     "navItems": [
-      { "id": "main", "label": "OpenShift Jira Solve Agent", "icon": "Bot", "default": true }
+      { "id": "main", "label": "Jira Solve", "icon": "Bot", "default": true }
     ]
   },
   "server": {

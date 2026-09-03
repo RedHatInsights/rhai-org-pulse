@@ -1,0 +1,64 @@
+{
+  "fetchedAt": "2026-08-25T18:00:00.000Z",
+  "prs": [
+    {
+      "repo": "openshift/hypershift",
+      "team": "hypershift",
+      "number": 1001,
+      "title": "OCPBUGS-1001: Fix control plane reconciliation",
+      "url": "https://github.com/openshift/hypershift/pull/1001",
+      "state": "MERGED",
+      "jiraKey": "OCPBUGS-1001"
+    }
+  ],
+  "issues": [
+    {
+      "key": "OCPBUGS-1001",
+      "summary": "Fix control plane reconciliation",
+      "status": "Closed",
+      "resolution": "Done",
+      "issueType": "Bug",
+      "priority": "Major",
+      "created": "2026-08-01T12:00:00.000Z",
+      "updated": "2026-08-20T12:00:00.000Z",
+      "labels": ["issue-for-agent", "agent-processed"],
+      "components": ["HyperShift"],
+      "assignee": "Demo User",
+      "agentState": "closed",
+      "processed": true,
+      "merged": true
+    },
+    {
+      "key": "OCPBUGS-1002",
+      "summary": "Improve installer validation",
+      "status": "In Progress",
+      "resolution": null,
+      "issueType": "Bug",
+      "priority": "Critical",
+      "created": "2026-08-10T12:00:00.000Z",
+      "updated": "2026-08-24T12:00:00.000Z",
+      "labels": ["issue-for-agent", "agent-processed"],
+      "components": ["Installer / openshift-installer"],
+      "assignee": null,
+      "agentState": "in-progress",
+      "processed": true,
+      "merged": false
+    },
+    {
+      "key": "TRT-1003",
+      "summary": "Stabilize an end-to-end test",
+      "status": "New",
+      "resolution": null,
+      "issueType": "Task",
+      "priority": "Major",
+      "created": "2026-08-22T12:00:00.000Z",
+      "updated": "2026-08-22T12:00:00.000Z",
+      "labels": ["issue-for-agent"],
+      "components": [],
+      "assignee": null,
+      "agentState": "new",
+      "processed": false,
+      "merged": false
+    }
+  ]
+}
