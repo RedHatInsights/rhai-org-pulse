@@ -1,5 +1,16 @@
 {
   "fetchedAt": "2026-08-25T18:00:00.000Z",
+  "prs": [
+    {
+      "repo": "openshift/hypershift",
+      "team": "hypershift",
+      "number": 1001,
+      "title": "OCPBUGS-1001: Fix control plane reconciliation",
+      "url": "https://github.com/openshift/hypershift/pull/1001",
+      "state": "MERGED",
+      "jiraKey": "OCPBUGS-1001"
+    }
+  ],
   "issues": [
     {
       "key": "OCPBUGS-1001",

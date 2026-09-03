@@ -22,7 +22,7 @@ test.describe('Jira Solve Agent Module @jira-solve-agent', () => {
     await expect(ocpbugsCard).toContainText('2');
     await expect(ocpbugsCard).toContainText('total candidate');
     await expect(ocpbugsCard).toContainText('total attempts');
-    await expect(ocpbugsCard).toContainText('total merges');
+    await expect(ocpbugsCard).toContainText('jira accepted');
 
     const mergeLink = page.getByRole('link', { name: 'View OCPBUGS merges in Jira' });
     await expect(mergeLink).toHaveAttribute('target', '_blank');

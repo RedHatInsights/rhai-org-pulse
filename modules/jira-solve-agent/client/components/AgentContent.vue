@@ -16,16 +16,27 @@
 
     <template v-else>
       <!-- Primary KPIs -->
-      <div class="px-6 pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <a :href="jiraSearchUrl(selectedTeam, 'attempts')" target="_blank" rel="noopener noreferrer" aria-label="View total attempts in Jira" class="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors shadow-sm">
+      <div class="px-6 pt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <a :href="selectedHasJiraMapping ? jiraSearchUrl(selectedTeam, 'attempts') : undefined" :aria-disabled="!selectedHasJiraMapping" target="_blank" rel="noopener noreferrer" aria-label="View total attempts in Jira" class="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors shadow-sm">
           <div class="text-4xl font-bold text-amber-600 dark:text-amber-400">{{ funnelMetrics.attempts }}</div>
-          <div class="text-sm font-semibold text-gray-600 dark:text-gray-300 mt-2 uppercase tracking-wide">Total Attempts</div>
+          <div class="text-sm font-semibold text-gray-600 dark:text-gray-300 mt-2 uppercase tracking-wide">Jira Attempts</div>
+          <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">agent-processed candidates</div>
         </a>
-        <a :href="jiraSearchUrl(selectedTeam, 'merges')" target="_blank" rel="noopener noreferrer" aria-label="View merged candidates for merge rate in Jira" class="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors shadow-sm">
+        <a :href="selectedHasJiraMapping ? jiraSearchUrl(selectedTeam, 'merges') : undefined" :aria-disabled="!selectedHasJiraMapping" target="_blank" rel="noopener noreferrer" aria-label="View accepted candidates in Jira" class="block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors shadow-sm">
           <div class="text-4xl font-bold text-purple-600 dark:text-purple-400">{{ funnelMetrics.mergeRate }}%</div>
-          <div class="text-sm font-semibold text-gray-600 dark:text-gray-300 mt-2 uppercase tracking-wide">Merge Rate</div>
-          <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ funnelMetrics.merges }}/{{ funnelMetrics.candidates }} candidates</div>
+          <div class="text-sm font-semibold text-gray-600 dark:text-gray-300 mt-2 uppercase tracking-wide">Jira Acceptance Rate</div>
+          <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ funnelMetrics.acceptances }}/{{ funnelMetrics.attempts }} attempted issues accepted</div>
         </a>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center shadow-sm">
+          <div class="text-4xl font-bold text-blue-600 dark:text-blue-400">{{ githubMetrics.total }}</div>
+          <div class="text-sm font-semibold text-gray-600 dark:text-gray-300 mt-2 uppercase tracking-wide">GitHub Agentic PRs</div>
+          <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">PRs opened by the Jira Solve bot</div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center shadow-sm" title="Actual merged bot PRs divided by bot PRs with a known GitHub state">
+          <div class="text-4xl font-bold text-emerald-600 dark:text-emerald-400">{{ formatRate(githubMetrics.mergeRate) }}</div>
+          <div class="text-sm font-semibold text-gray-600 dark:text-gray-300 mt-2 uppercase tracking-wide">GitHub PR Merge Rate</div>
+          <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ githubMetrics.merged }}/{{ githubMetrics.withKnownState }} agentic PRs with a known state</div>
+        </div>
       </div>
 
       <!-- Team selector with inline stats -->
@@ -60,7 +71,7 @@
               {{ repo }}
             </span>
           </span>
-          <div class="grid grid-cols-3">
+          <div v-if="hasJiraMapping(team.key)" class="grid grid-cols-3">
             <div class="min-w-0 px-1 text-center">
               <a :href="jiraSearchUrl(team.key, 'candidates')" target="_blank" rel="noopener noreferrer" :aria-label="`View ${team.label} candidates in Jira`" :class="['block text-xl font-bold hover:underline', selectedTeam === team.key ? 'text-white' : 'text-gray-900 dark:text-gray-100']">{{ teamStats(team.key).candidates }}</a>
               <div :class="['text-[9px] uppercase leading-tight tracking-wide', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total candidate</div>
@@ -70,24 +81,27 @@
               <div :class="['text-[9px] uppercase leading-tight tracking-wide', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total attempts</div>
             </div>
             <div :class="['min-w-0 px-1 text-center border-l', selectedTeam === team.key ? 'border-white/20' : 'border-gray-200 dark:border-gray-700']">
-              <a :href="jiraSearchUrl(team.key, 'merges')" target="_blank" rel="noopener noreferrer" :aria-label="`View ${team.label} merges in Jira`" :class="['block text-xl font-bold hover:underline', selectedTeam === team.key ? 'text-white' : 'text-emerald-600 dark:text-emerald-400']">{{ teamStats(team.key).merges }}</a>
-              <div :class="['text-[9px] uppercase leading-tight tracking-wide', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">total merges</div>
+              <a :href="jiraSearchUrl(team.key, 'merges')" target="_blank" rel="noopener noreferrer" :aria-label="`View ${team.label} merges in Jira`" :class="['block text-xl font-bold hover:underline', selectedTeam === team.key ? 'text-white' : 'text-emerald-600 dark:text-emerald-400']">{{ teamStats(team.key).acceptances }}</a>
+              <div :class="['text-[9px] uppercase leading-tight tracking-wide', selectedTeam === team.key ? 'text-white/60' : 'text-gray-400 dark:text-gray-500']">jira accepted</div>
             </div>
+          </div>
+          <div v-else :class="['py-2 text-xs', selectedTeam === team.key ? 'text-white/70' : 'text-gray-400 dark:text-gray-500']">
+            GitHub activity only · no Jira mapping
           </div>
         </div>
       </div>
 
       <!-- Stat cards -->
       <div class="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <a :href="jiraSearchUrl(selectedTeam, 'candidates')" target="_blank" rel="noopener noreferrer" aria-label="View total candidates in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
+        <a :href="selectedHasJiraMapping ? jiraSearchUrl(selectedTeam, 'candidates') : undefined" :aria-disabled="!selectedHasJiraMapping" target="_blank" rel="noopener noreferrer" aria-label="View total candidates in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
           <div class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ funnelMetrics.candidates }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Total Candidates</div>
         </a>
-        <a :href="jiraSearchUrl(selectedTeam, 'merges')" target="_blank" rel="noopener noreferrer" aria-label="View total merges in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
-          <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ funnelMetrics.merges }}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Total Merges</div>
+        <a :href="selectedHasJiraMapping ? jiraSearchUrl(selectedTeam, 'merges') : undefined" :aria-disabled="!selectedHasJiraMapping" target="_blank" rel="noopener noreferrer" aria-label="View total merges in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
+          <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ funnelMetrics.acceptances }}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">Jira Acceptances</div>
         </a>
-        <a :href="jiraSearchUrl(selectedTeam, 'in-progress')" target="_blank" rel="noopener noreferrer" aria-label="View in-progress candidates in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
+        <a :href="selectedHasJiraMapping ? jiraSearchUrl(selectedTeam, 'in-progress') : undefined" :aria-disabled="!selectedHasJiraMapping" target="_blank" rel="noopener noreferrer" aria-label="View in-progress candidates in Jira" class="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
           <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ funnelMetrics.inProgress }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide">In Progress</div>
         </a>
@@ -384,19 +398,29 @@ function teamStats(teamKey) {
 
 function computeTeamStats(teamKey) {
   if (!props.agentData?.issues) {
-    return { candidates: 0, attempts: 0, merges: 0 };
+    return { candidates: 0, attempts: 0, acceptances: 0 };
   }
   const issues = candidateIssues(filterByTeam(props.agentData.issues, teamKey));
   return {
     candidates: issues.length,
     attempts: issues.filter(issue => issue.processed).length,
-    merges: issues.filter(issue => issue.merged).length
+    acceptances: issues.filter(issue => issue.processed && issue.merged).length
   };
 }
 
 function candidateIssues(issues) {
   return issues.filter(issue => issue.source !== 'chai-bot-pr');
 }
+
+function hasJiraMapping(teamKey) {
+  if (teamKey === 'all') return true;
+  const team = TEAMS.find(option => option.key === teamKey);
+  if (!team) return false;
+  const prefixes = team.projectPrefixes || (team.projectPrefix ? [team.projectPrefix] : []);
+  return prefixes.length > 0 || Boolean(team.components?.length);
+}
+
+const selectedHasJiraMapping = computed(() => hasJiraMapping(selectedTeam.value));
 
 function jiraSearchUrl(teamKey, metric) {
   const team = TEAMS.find(option => option.key === teamKey);
@@ -413,7 +437,7 @@ function jiraSearchUrl(teamKey, metric) {
   }
   let metricClause = '';
   if (metric === 'attempts') metricClause = ' AND labels = "agent-processed"';
-  if (metric === 'merges') metricClause = ' AND resolution IN (Done, "Done-Errata")';
+  if (metric === 'merges') metricClause = ' AND labels = "agent-processed" AND resolution IN (Done, "Done-Errata")';
   if (metric === 'in-progress') metricClause = ' AND statusCategory = "In Progress"';
   return `${jiraHost.value}/issues/?jql=${encodeURIComponent(issueClause + metricClause)}`;
 }
@@ -422,11 +446,26 @@ const funnelMetrics = computed(() => {
   const issues = candidateIssues(teamFilteredIssues.value);
   const candidates = issues.length;
   const attempts = issues.filter(issue => issue.processed).length;
-  const merges = issues.filter(issue => issue.merged).length;
+  const acceptances = issues.filter(issue => issue.processed && issue.merged).length;
   const inProgress = issues.filter(issue => issue.agentState === 'in-progress').length;
-  const mergeRate = candidates > 0 ? Math.round((merges / candidates) * 100) : 0;
-  return { candidates, attempts, merges, inProgress, mergeRate };
+  const mergeRate = attempts > 0 ? Math.round((acceptances / attempts) * 100) : 0;
+  return { candidates, attempts, acceptances, inProgress, mergeRate };
 });
+
+const githubMetrics = computed(() => {
+  const allPrs = props.agentData?.prs || [];
+  const prs = selectedTeam.value === 'all'
+    ? allPrs
+    : allPrs.filter(pr => pr.team === selectedTeam.value);
+  const knownPrs = prs.filter(pr => ['OPEN', 'MERGED', 'CLOSED'].includes((pr.state || '').toUpperCase()));
+  const merged = knownPrs.filter(pr => pr.state.toUpperCase() === 'MERGED').length;
+  const mergeRate = knownPrs.length > 0 ? Math.round((merged / knownPrs.length) * 100) : null;
+  return { total: prs.length, withKnownState: knownPrs.length, merged, mergeRate };
+});
+
+function formatRate(rate) {
+  return rate === null ? '—' : `${rate}%`;
+}
 
 // Jira keys sort naturally: by project, then numerically, so OCPBUGS-9 comes
 // before OCPBUGS-100 rather than after it lexicographically. NO-JIRA rows have

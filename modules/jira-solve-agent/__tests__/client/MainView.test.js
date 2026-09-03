@@ -19,6 +19,10 @@ describe('AgentContent', () => {
       processedCount: 1,
       processedRate: 10
     },
+    prs: [
+      { repo: 'openshift/hypershift', team: 'hypershift', number: 9137, state: 'OPEN' },
+      { repo: 'openshift/windows-machine-config-operator', team: 'wmco', number: 321, state: 'MERGED' }
+    ],
     issues: [
       { key: 'OCPBUGS-1', summary: 'HyperShift bug', status: 'New', resolution: null, agentState: 'new', processed: false, merged: false, issueType: 'Bug', priority: 'Major', created: '2026-07-01', updated: '2026-07-07', labels: ['issue-for-agent'], components: ['HyperShift'], assignee: null, linkedPrs: [{ repo: 'openshift/hypershift', team: 'hypershift', number: 9137, url: 'https://github.com/openshift/hypershift/pull/9137', state: 'OPEN', author: 'x' }, { repo: 'openshift/origin', team: 'trt', number: 31382, url: 'https://github.com/openshift/origin/pull/31382', state: 'CLOSED', author: 'y' }] },
       { key: 'CNTRLPLANE-10', summary: 'Installer issue', status: 'In Progress', resolution: null, agentState: 'in-progress', processed: true, merged: false, issueType: 'Bug', priority: 'Critical', created: '2026-07-02', updated: '2026-07-06', labels: ['issue-for-agent', 'agent-processed'], components: ['Installer / openshift-installer'], assignee: 'Jane' },
@@ -39,10 +43,15 @@ describe('AgentContent', () => {
     })
     expect(wrapper.text()).toContain('10')
     expect(wrapper.text()).toContain('Total Candidates')
-    expect(wrapper.text()).toContain('Total Attempts')
-    expect(wrapper.text()).toContain('Total Merges')
-    expect(wrapper.text()).toContain('Merge Rate')
-    expect(wrapper.text()).toContain('10%')
+    expect(wrapper.text()).toContain('Jira Attempts')
+    expect(wrapper.text()).toContain('Jira Acceptances')
+    expect(wrapper.text()).toContain('Jira Acceptance Rate')
+    expect(wrapper.text()).toContain('GitHub PR Merge Rate')
+    const acceptanceCard = wrapper.find('a[aria-label="View accepted candidates in Jira"]')
+    // The resolved sample was never marked agent-processed, so it is not an
+    // accepted attempt and cannot inflate the attempted-to-accepted rate.
+    expect(acceptanceCard.text()).toContain('0%')
+    expect(acceptanceCard.text()).toContain('0/1 attempted issues accepted')
   })
 
   it('renders the issue table with Key, Summary, PR Status and Jira Status columns', () => {
@@ -99,7 +108,7 @@ describe('AgentContent', () => {
     expect(allBtn.exists()).toBe(true)
     expect(allBtn.element.parentElement.textContent).toContain('total candidate')
     expect(allBtn.element.parentElement.textContent).toContain('total attempts')
-    expect(allBtn.element.parentElement.textContent).toContain('total merges')
+    expect(allBtn.element.parentElement.textContent).toContain('jira accepted')
     expect(buttons.some(b => b.text().includes('HyperShift'))).toBe(true)
     expect(buttons.some(b => b.text().includes('Installer'))).toBe(true)
     expect(buttons.some(b => b.text().includes('TRT'))).toBe(true)
@@ -115,11 +124,35 @@ describe('AgentContent', () => {
     // The WMCO box matches two issues (WINC-5 by prefix, OCPBUGS-3 by the
     // "Windows Containers" component); only WINC-5's linked PR is MERGED.
     const wmcoBtn = wrapper.findAll('button').find(b => b.text().includes('Windows Containers'))
-    expect(wmcoBtn.element.parentElement.textContent).toContain('total merges')
+    expect(wmcoBtn.element.parentElement.textContent).toContain('jira accepted')
     // Neither Jira issue has an accepted merge resolution, even though one
     // carries a merged GitHub PR.
     const nums = [...wmcoBtn.element.parentElement.querySelectorAll('.text-xl')].map(n => n.textContent)
     expect(nums).toEqual(['2', '0', '0'])
+  })
+
+  it('keeps actual GitHub PR merge rate distinct from Jira acceptance', () => {
+    const wrapper = mount(AgentContent, {
+      props: { agentData: sampleData, loading: false, error: null }
+    })
+    const githubCard = wrapper.find('[title="Actual merged bot PRs divided by bot PRs with a known GitHub state"]')
+    // Two bot PRs have known states and one is actually merged.
+    expect(githubCard.text()).toContain('50%')
+    expect(githubCard.text()).toContain('1/2 agentic PRs with a known state')
+  })
+
+  it('disables Jira metrics for repository-only teams', async () => {
+    const wrapper = mount(AgentContent, {
+      props: { agentData: sampleData, loading: false, error: null }
+    })
+    const teamButton = wrapper.findAll('button').find(button => button.text().includes('Cluster Lifecycle'))
+    expect(teamButton.element.parentElement.textContent).toContain('GitHub activity only · no Jira mapping')
+    expect(teamButton.element.parentElement.querySelectorAll('a')).toHaveLength(0)
+
+    await teamButton.trigger('click')
+    const attempts = wrapper.find('a[aria-label="View total attempts in Jira"]')
+    expect(attempts.attributes('href')).toBeUndefined()
+    expect(attempts.attributes('aria-disabled')).toBe('true')
   })
 
   it('filters issues by team when team button is clicked', async () => {
@@ -199,6 +232,7 @@ describe('AgentContent', () => {
     expect(jqlFor('View HyperShift candidates in Jira')).toContain('component IN ("HyperShift", "Hosted Control Planes")')
     expect(jqlFor('View Installer attempts in Jira')).toContain('labels = "agent-processed"')
     expect(jqlFor('View TRT merges in Jira')).toContain('resolution IN (Done, "Done-Errata")')
+    expect(jqlFor('View TRT merges in Jira')).toContain('labels = "agent-processed"')
     expect(jqlFor('View OCPBUGS candidates in Jira')).toContain('project IN (OCPBUGS)')
   })
 
