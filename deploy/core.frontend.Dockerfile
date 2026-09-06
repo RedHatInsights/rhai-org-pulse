@@ -32,7 +32,7 @@ COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
 RUN npm run build
 
 # Stage 3: Serve with Red Hat Hardened nginx (distroless)
-FROM registry.access.redhat.com/hi/nginx:1.30.4@sha256:e54f1103a60f9b60e2f17778abaf23e6ff73b76f1ea8374728c5443f1e82dcf0
+FROM registry.access.redhat.com/hi/nginx:1.30.4@sha256:7b722619f2c54d1201f0012054443ddf5ba5b69c0963ee020fa5079e2b62baba
 
 COPY deploy/nginx-default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
