@@ -108,40 +108,16 @@ test.describe('Frontend Smoke Tests', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Capture initial URL (hash-based routing)
-    const initialUrl = page.url();
+    // Use a known internal destination. Generic nav anchors may be external
+    // links that intentionally open a new tab and leave this URL unchanged.
+    const teamTrackerLink = page.getByRole('button', {
+      name: /Agentic Team, Engineer & Repo Structure/
+    });
+    await expect(teamTrackerLink).toBeVisible();
+    await teamTrackerLink.click();
 
-    // Find and click a navigation link (settings, or any secondary nav item)
-    // Using multiple selectors to be resilient to UI changes
-    const navLink = page.locator('a[href*="settings"], a:has-text("Settings"), nav a').first();
-
-    if (await navLink.count() > 0) {
-      await navLink.click();
-
-      // Add buffer in case the page needs time to load
-      await page.waitForTimeout(1000);
-
-      // Verify URL changed (hash routing)
-      const newUrl = page.url();
-      expect(newUrl).not.toBe(initialUrl);
-
-      // Verify page still renders without errors
-      const appContainer = page.locator('#app');
-      await expect(appContainer).toBeVisible();
-    } else {
-      // If no settings link found, try any navigation link
-      const anyNavLink = page.locator('nav a, aside a').nth(1); // Second nav item
-
-      if (await anyNavLink.count() > 0) {
-        await anyNavLink.click();
-        await page.waitForTimeout(1000);
-
-        const newUrl = page.url();
-        expect(newUrl).not.toBe(initialUrl);
-      } else {
-        console.warn('No navigation links found to test routing');
-      }
-    }
+    await expect(page).toHaveURL(/#\/team-tracker\/home$/);
+    await expect(page.locator('#app')).toBeVisible();
     expect(page.errors).toHaveLength(0);
   });
 
