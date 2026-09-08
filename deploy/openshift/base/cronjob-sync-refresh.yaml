@@ -1,3 +1,6 @@
+# NOTE: This CronJob definition must be kept in sync with deploy/templates/backend.yaml (used by
+# app-interface prod/stage). Intentional differences: this uses ${CRON_ADMIN_EMAIL} from ConfigMap
+# (vs CRONJOB_ADMIN_EMAIL template param), and includes envFrom + optional AWS_BACKUP_BUCKET backup step.
 apiVersion: batch/v1
 kind: CronJob
 metadata:

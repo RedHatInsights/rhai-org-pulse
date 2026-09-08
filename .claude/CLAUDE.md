@@ -148,7 +148,7 @@ Kustomize layers: `base/` (core platform + team-tracker) → `overlays/ai-eng/` 
 - `GH_PAT` — Personal access token with admin bypass, used by CI to create and auto-merge image tag update PRs
 - `GCP_SA_KEY` — GCP service account JSON key for Vertex AI auth (Claude code review)
 
-**Daily CronJob** (`deploy/openshift/base/cronjob-sync-refresh.yaml`): Runs at 6:00 AM UTC, triggers roster sync then full metrics refresh via the backend API. Uses `CRON_ADMIN_EMAIL` from ConfigMap. S3 backup step is conditional on `AWS_BACKUP_BUCKET`.
+**Daily CronJob**: Runs at 6:00 AM UTC (production only; suspended on stage). Triggers module sync, then unified refresh via `POST /api/admin/refresh-all` — runs all registered handlers in order: roster-sync(10) → metrics(20) → github+gitlab(30) → allocation(40) → ai-impact RFE+autofix+doc(50) → feature-sync+test-plan-sync+jira-solve(60) → releases(65-70) → snapshots(80). Polls `GET /api/admin/refresh/status` until complete. Two CronJob definitions exist and must be kept in sync: `deploy/openshift/base/cronjob-sync-refresh.yaml` (ai-eng kustomize overlays) uses `CRON_ADMIN_EMAIL` from ConfigMap + optional `AWS_BACKUP_BUCKET` for backup; `deploy/templates/backend.yaml` (app-interface prod/stage) uses `CRONJOB_ADMIN_EMAIL` template param, no backup.
 
 ### Testing
 
