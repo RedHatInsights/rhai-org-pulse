@@ -117,7 +117,7 @@ test.describe('Frontend Smoke Tests', () => {
     await teamTrackerLink.click();
 
     await expect(page).toHaveURL(/#\/team-tracker\/home$/);
-    await expect(page.locator('#app')).toBeVisible();
+    await expect(page.locator('#app').first()).toBeVisible();
     expect(page.errors).toHaveLength(0);
   });
 
