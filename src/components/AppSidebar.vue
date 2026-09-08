@@ -21,7 +21,7 @@
         <img src="/redhat-logo.svg" alt="Red Hat" class="h-8 w-8 flex-shrink-0" />
         <transition name="fade">
           <div v-if="!collapsed" class="overflow-hidden whitespace-nowrap flex-1">
-            <h1 class="text-sm font-bold text-gray-900 dark:text-gray-100 leading-tight">Org Pulse</h1>
+            <h1 class="text-sm font-bold text-gray-900 dark:text-gray-100 leading-tight">Hybrid Platforms Org Pulse</h1>
             <p v-if="titlePrefix" class="text-xs text-gray-400 dark:text-gray-500">{{ titlePrefix }}</p>
           </div>
         </transition>
@@ -91,9 +91,13 @@
           <!-- Regular items (or collapsed mode) -->
           <template v-else>
             <template v-for="item in section.items" :key="item.id">
-              <button
+              <component
+                :is="item.href ? 'a' : 'button'"
                 v-if="!section.collapsible || collapsed"
-                @click="$emit('navigate', item.id)"
+                :href="item.href"
+                :target="item.href ? '_blank' : undefined"
+                :rel="item.href ? 'noopener noreferrer' : undefined"
+                @click="!item.href && $emit('navigate', item.id)"
                 :aria-current="isNavItemActive(item, section) ? 'page' : undefined"
                 :aria-label="item.label"
                 class="group relative w-full flex items-center py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
@@ -120,7 +124,7 @@
                 >
                   {{ item.label }}
                 </span>
-              </button>
+              </component>
             </template>
           </template>
         </div>
@@ -446,6 +450,31 @@ const navSections = computed(() => {
       }))
     })
   }
+
+  sections.push({
+    id: 'agentic-tools',
+    label: 'Agentic Tools',
+    items: [
+      {
+        id: 'repo-agent-readiness',
+        label: 'Agentic Readiness',
+        icon: GitBranch,
+        href: 'https://fleet-insights.apps.engineering.openshift.org/hybrid-platforms/ocp/ai-enablement'
+      },
+      {
+        id: 'valorflow',
+        label: 'ValorFlow Refinement',
+        icon: Wand2,
+        href: 'https://valorflow.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com/'
+      },
+      {
+        id: 'hypershell',
+        label: 'HyperShell',
+        icon: Rocket,
+        href: 'https://hypershell.apps.rosa.hcmais01ue1.s9m2.p3.openshiftapps.com/'
+      }
+    ]
+  })
 
   if (props.isAdmin) {
     sections.push({
