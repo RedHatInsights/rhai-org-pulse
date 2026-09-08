@@ -22,4 +22,4 @@ images:
 - name: quay.io/org-pulse/team-tracker-backend
   newTag: eb91e7458ef61f0ef676199a57a5c530f067f289
 - name: quay.io/org-pulse/team-tracker-frontend
-  newTag: eb91e7458ef61f0ef676199a57a5c530f067f289
+  newTag: 0c5ed137c695e3ae7a2638983d77b5a77331f405
