@@ -1,4 +1,4 @@
-.PHONY: build-frontend-image build-backend-image build-core-frontend-image build-core-backend-image build-core-frontend-builder-image build-core-frontend-runtime-image build-core-base-images smoke-test smoke-test-core _start-frontend clean-smoke-test clean-integration-test test-module help
+.PHONY: build-frontend-image build-backend-image build-core-frontend-image build-core-backend-image build-core-frontend-builder-image build-core-frontend-runtime-image build-core-base-images smoke-test smoke-test-core _create-test-network _start-frontend clean-smoke-test clean-integration-test test-module help
 
 FRONTEND_IMAGE ?= frontend-smoke-local
 BACKEND_IMAGE ?= backend-smoke-local
@@ -7,16 +7,18 @@ CORE_BACKEND_IMAGE ?= core-backend-smoke-local
 CORE_FRONTEND_BUILDER_IMAGE ?= core-frontend-builder-smoke-local
 CORE_FRONTEND_RUNTIME_IMAGE ?= core-frontend-runtime-smoke-local
 CORE_TAG ?= local
-FRONTEND_CONTAINER := frontend-smoke-local
-BACKEND_CONTAINER := backend-smoke-local
+FRONTEND_CONTAINER ?= frontend-smoke-local
+BACKEND_CONTAINER ?= backend-smoke-local
 PLAYWRIGHT_IMAGE := mcr.microsoft.com/playwright:v1.61.1
-BACKEND_PORT := 3001
-FRONTEND_PORT := 8080
+BACKEND_CONTAINER_PORT := 3001
+FRONTEND_CONTAINER_PORT := 8080
+BACKEND_HOST_PORT ?= $(BACKEND_CONTAINER_PORT)
+FRONTEND_HOST_PORT ?= $(FRONTEND_CONTAINER_PORT)
+TEST_NETWORK ?= org-pulse-test
 WORKSPACE := /workspace
 
 # Used for configuring container-based commands
 CONTAINER_RUNTIME ?= $(shell basename $$(command -v podman 2>/dev/null) || echo "docker")
-OS := $(shell uname -s)
 
 # Environment variables for Playwright container
 # PLAYWRIGHT_BROWSERS_PATH: Use pre-installed browsers in the container
@@ -26,7 +28,7 @@ COMMON_ENV := \
 	-e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
 	-e XDG_CACHE_HOME=/tmp/.cache \
 	-e npm_config_cache=/tmp/.npm \
-	-e BASE_URL=http://localhost:$(FRONTEND_PORT)
+	-e BASE_URL=http://localhost:$(FRONTEND_HOST_PORT)
 
 CONTAINER_FLAGS := --rm -t \
 	--network host \
@@ -41,22 +43,15 @@ SETUP_CMD := mkdir -p /tmp/.cache /tmp/.npm && npm ci --silent
 # then wait for the health check to pass
 define start-container
 	@echo "Starting $(1) container..."
-	@if [ "$(CONTAINER_RUNTIME)" = "podman" ] && [ "$(OS)" = "Darwin" ]; then \
-		$(CONTAINER_RUNTIME) run -d \
-			-p $(3):$(3) \
-			$(5) \
-			--name $(1) \
-			$(2) > /dev/null; \
-	else \
-		$(CONTAINER_RUNTIME) run -d \
-			--network host \
-			$(5) \
-			--name $(1) \
-			$(2) > /dev/null; \
-	fi
+	@$(CONTAINER_RUNTIME) run -d \
+		-p $(3):$(4) \
+		--network $(TEST_NETWORK) \
+		$(6) \
+		--name $(1) \
+		$(2) > /dev/null
 	@echo "Waiting for $(1) to be ready..."
 	@for i in 1 2 3 4 5 6 7 8 9 10; do \
-		if curl -sf http://localhost:$(3)$(4) > /dev/null 2>&1; then \
+		if curl -sf http://localhost:$(3)$(5) > /dev/null 2>&1; then \
 			echo "$(1) is ready (attempt $$i)"; \
 			break; \
 		fi; \
@@ -115,16 +110,10 @@ build-core-base-images: build-core-backend-image build-core-frontend-builder-ima
 # ========================================
 # Smoke Tests
 # ========================================
-smoke-test: ## Run smoke tests against AI Eng images
+smoke-test: _create-test-network ## Run smoke tests against AI Eng images
 	# Start backend container in demo mode (uses fixture data, no credentials needed)
-	$(call start-container,$(BACKEND_CONTAINER),$(BACKEND_IMAGE),$(BACKEND_PORT),/api/healthz,-e DEMO_MODE=true)
-	# Start frontend (macOS/Podman uses gateway IP, others use localhost)
-	@if [ "$(CONTAINER_RUNTIME)" = "podman" ] && [ "$(OS)" = "Darwin" ]; then \
-		BACKEND_HOST=$$($(CONTAINER_RUNTIME) run --rm alpine ip route | awk '/default/ {print $$3}'); \
-		$(MAKE) -s _start-frontend BACKEND_HOST=$$BACKEND_HOST; \
-	else \
-		$(MAKE) -s _start-frontend BACKEND_HOST=127.0.0.1; \
-	fi
+	$(call start-container,$(BACKEND_CONTAINER),$(BACKEND_IMAGE),$(BACKEND_HOST_PORT),$(BACKEND_CONTAINER_PORT),/api/healthz,--network-alias backend -e DEMO_MODE=true)
+	$(MAKE) -s _start-frontend
 	# Run Playwright tests in container (no local browser installation needed)
 	@echo "Running Playwright smoke tests in container..."
 	$(CONTAINER_RUNTIME) run $(CONTAINER_FLAGS) $(COMMON_ENV) \
@@ -134,14 +123,9 @@ smoke-test: ## Run smoke tests against AI Eng images
 	@echo "All smoke tests passed!"
 	@$(MAKE) clean-smoke-test
 
-smoke-test-core: ## Run smoke tests against core images
-	$(call start-container,$(BACKEND_CONTAINER),$(CORE_BACKEND_IMAGE),$(BACKEND_PORT),/api/healthz,-e DEMO_MODE=true)
-	@if [ "$(CONTAINER_RUNTIME)" = "podman" ] && [ "$(OS)" = "Darwin" ]; then \
-		BACKEND_HOST=$$($(CONTAINER_RUNTIME) run --rm alpine ip route | awk '/default/ {print $$3}'); \
-		$(MAKE) -s _start-frontend BACKEND_HOST=$$BACKEND_HOST FRONTEND_IMAGE=$(CORE_FRONTEND_IMAGE); \
-	else \
-		$(MAKE) -s _start-frontend BACKEND_HOST=127.0.0.1 FRONTEND_IMAGE=$(CORE_FRONTEND_IMAGE); \
-	fi
+smoke-test-core: _create-test-network ## Run smoke tests against core images
+	$(call start-container,$(BACKEND_CONTAINER),$(CORE_BACKEND_IMAGE),$(BACKEND_HOST_PORT),$(BACKEND_CONTAINER_PORT),/api/healthz,--network-alias backend -e DEMO_MODE=true)
+	$(MAKE) -s _start-frontend FRONTEND_IMAGE=$(CORE_FRONTEND_IMAGE)
 	@echo "Running Playwright smoke tests against core images..."
 	$(CONTAINER_RUNTIME) run $(CONTAINER_FLAGS) $(COMMON_ENV) \
 		$(PLAYWRIGHT_IMAGE) \
@@ -150,11 +134,16 @@ smoke-test-core: ## Run smoke tests against core images
 	@echo "Core smoke tests passed!"
 	@$(MAKE) clean-smoke-test
 
-# Helper target to start frontend with dynamic BACKEND_HOST
+# Create an isolated network so frontend-to-backend traffic is independent of host ports
+_create-test-network:
+	@$(CONTAINER_RUNTIME) network inspect $(TEST_NETWORK) > /dev/null 2>&1 || \
+		$(CONTAINER_RUNTIME) network create $(TEST_NETWORK) > /dev/null
+
+# Helper target to start the frontend
 # Note: This is a target (not a function) because calling $(call start-container,...)
 # on a backslash-continued line causes Makefile escaping issues with @ and $$ symbols
 _start-frontend:
-	$(call start-container,$(FRONTEND_CONTAINER),$(FRONTEND_IMAGE),$(FRONTEND_PORT),/healthz,--add-host=backend:$(BACKEND_HOST))
+	$(call start-container,$(FRONTEND_CONTAINER),$(FRONTEND_IMAGE),$(FRONTEND_HOST_PORT),$(FRONTEND_CONTAINER_PORT),/healthz,)
 
 # ========================================
 # Integration Tests
@@ -162,7 +151,7 @@ _start-frontend:
 # Generic target for running module-specific integration tests
 # Usage: make test-module MODULE=ai-impact
 # This starts the app containers and runs Playwright tests tagged with @<MODULE>
-test-module: ## Run integration tests for a module (MODULE=<name>)
+test-module: _create-test-network ## Run integration tests for a module (MODULE=<name>)
 	@if [ -z "$(MODULE)" ]; then \
 		echo "ERROR: MODULE variable is required"; \
 		echo "Usage: make test-module MODULE=ai-impact"; \
@@ -170,14 +159,9 @@ test-module: ## Run integration tests for a module (MODULE=<name>)
 	fi
 	@echo "Running integration tests for module: $(MODULE)"
 	# Start backend container
-	$(call start-container,$(BACKEND_CONTAINER),$(BACKEND_IMAGE),$(BACKEND_PORT),/api/healthz,-e DEMO_MODE=true)
+	$(call start-container,$(BACKEND_CONTAINER),$(BACKEND_IMAGE),$(BACKEND_HOST_PORT),$(BACKEND_CONTAINER_PORT),/api/healthz,--network-alias backend -e DEMO_MODE=true)
 	# Start frontend container
-	@if [ "$(CONTAINER_RUNTIME)" = "podman" ] && [ "$(OS)" = "Darwin" ]; then \
-		BACKEND_HOST=$$($(CONTAINER_RUNTIME) run --rm alpine ip route | awk '/default/ {print $$3}'); \
-		$(MAKE) -s _start-frontend BACKEND_HOST=$$BACKEND_HOST; \
-	else \
-		$(MAKE) -s _start-frontend BACKEND_HOST=127.0.0.1; \
-	fi
+	$(MAKE) -s _start-frontend
 	# Run integration tests filtered by module tag
 	@echo "Running Playwright tests tagged with @$(MODULE)..."
 	$(CONTAINER_RUNTIME) run $(CONTAINER_FLAGS) $(COMMON_ENV) \
@@ -196,6 +180,7 @@ clean-smoke-test:
 	@$(CONTAINER_RUNTIME) rm $(FRONTEND_CONTAINER) > /dev/null 2>&1 || true
 	@$(CONTAINER_RUNTIME) stop $(BACKEND_CONTAINER) > /dev/null 2>&1 || true
 	@$(CONTAINER_RUNTIME) rm $(BACKEND_CONTAINER) > /dev/null 2>&1 || true
+	@$(CONTAINER_RUNTIME) network rm $(TEST_NETWORK) > /dev/null 2>&1 || true
 	@echo "Cleanup complete"
 
 # Alias for integration test cleanup (uses same containers as smoke tests for now)

@@ -110,6 +110,9 @@ npm run validate:openapi      # Validate OpenAPI annotations
 make smoke-test-core            # Run smoke tests against core images
 make smoke-test                 # Run smoke tests against AI Eng images
 make test-module MODULE=<name>  # Run integration tests for a module
+
+# Override host ports when 3001 or 8080 is occupied
+make BACKEND_HOST_PORT=3101 FRONTEND_HOST_PORT=8180 smoke-test-core
 ```
 
 ## Tech Stack
@@ -132,4 +135,3 @@ For local testing with Kind (Kubernetes in Docker), see [deploy/KIND.md](deploy/
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, project structure, and code style guidelines.
 
 Architecture and deployment details are in [`.claude/CLAUDE.md`](.claude/CLAUDE.md) — Claude Code reads this automatically.
-
