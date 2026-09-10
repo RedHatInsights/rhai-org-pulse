@@ -175,6 +175,13 @@ make build-frontend-image  # Build AI Eng frontend image (all modules)
 make smoke-test            # Run smoke tests against AI Eng images
 ```
 
+The host ports can be changed without changing the ports inside the application
+containers. This lets smoke tests run alongside a local development server:
+
+```bash
+make BACKEND_HOST_PORT=3101 FRONTEND_HOST_PORT=8180 smoke-test-core
+```
+
 Smoke tests run Playwright in a container, so no local browser installation is needed. The backend runs in demo mode (using fixture data) so no credentials are required.
 
 **macOS note:** The Playwright container bind-mounts your workspace and runs `npm ci`, which installs Linux-native packages into your local `node_modules/`. After running `make smoke-test`, you may need to run `npm ci` again to restore macOS-native packages before running local commands like `npm test` or `npm run dev`.

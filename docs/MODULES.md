@@ -269,6 +269,8 @@ The component will be rendered as a tab in the shell's Settings page.
 - Run all tests: `npm test`
 - Module manifest validation: `npm run validate:modules`
 - **Integration tests**: Playwright tests in `tests/integration/` validate module UI (see CONTRIBUTING.md)
+- **Smoke-test ports**: Set `BACKEND_HOST_PORT` and `FRONTEND_HOST_PORT` when
+  the default host ports 3001 and 8080 are occupied.
 
 ## CODEOWNERS
 

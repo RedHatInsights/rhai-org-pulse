@@ -103,6 +103,15 @@ Non-secret config (e.g. `JIRA_HOST`, `DEMO_MODE`) is exempt. See
 - **Validation**: `npm run validate:modules` for module manifests
 - Run `npm test` before committing
 
+`npm test` runs Vitest only; it does not run the Playwright smoke suite. Changes
+to `package.json`, `package-lock.json`, the `Makefile`, container build files,
+the shared application shell or navigation, or `tests/smoke/` require both
+`make smoke-test-core` and `make smoke-test` before handoff. Build the matching
+images first using the commands documented below. Use `BACKEND_HOST_PORT` and
+`FRONTEND_HOST_PORT` when the default host ports are occupied.
+If a required smoke test cannot run, report the exact blocker and do not claim
+CI-equivalent verification.
+
 **Integration test enforcement:** PRs that modify files in `modules/` (views, components, server routes, server logic) **require** corresponding integration test updates. This is enforced during code review. See `.github/instructions/review.instructions.md` for the full policy and exceptions.
 
 ## Code Review
@@ -129,6 +138,9 @@ npm run validate:openapi      # Validate OpenAPI annotations
 make smoke-test-core            # Run smoke tests against core images
 make smoke-test                 # Run smoke tests against AI Eng images
 make test-module MODULE=<name>  # Run integration tests for a module
+
+# Avoid locally occupied default ports
+make BACKEND_HOST_PORT=3101 FRONTEND_HOST_PORT=8180 smoke-test-core
 ```
 
 ## Agent Instruction Files
