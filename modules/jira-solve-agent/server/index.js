@@ -120,6 +120,7 @@ module.exports = function registerRoutes(router, context) {
         jiraHost: JIRA_HOST,
         teamRepos: TEAM_REPOS,
         metrics: { totalIssues: 0, byState: {}, processedCount: 0, processedRate: 0 },
+        prs: [],
         issues: []
       });
     }
@@ -133,6 +134,7 @@ module.exports = function registerRoutes(router, context) {
       // without duplicating (and drifting from) the server's mapping.
       teamRepos: TEAM_REPOS,
       metrics,
+      prs: data.prs || [],
       issues: data.issues
     });
   });
