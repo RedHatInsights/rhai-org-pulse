@@ -28,43 +28,22 @@ test.describe('Upstream Pulse Module @upstream-pulse', () => {
     logCapturedErrors(page, testInfo);
   });
 
-  test('should be visible in sidebar navigation', async ({ page }) => {
+  test('should be hidden from sidebar navigation', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Find the Upstream Pulse module in the sidebar
-    const moduleNav = page.locator('aside nav').filter({ hasText: 'Upstream Pulse' });
-    const count = await moduleNav.count();
-    expect(count).toBeGreaterThan(0);
-
-    // Verify the module link is visible and clickable
-    const moduleLink = moduleNav.first();
-    await expect(moduleLink).toBeVisible();
+    await expect(page.locator('aside nav button[aria-label="Upstream Pulse"]')).toHaveCount(0);
 
     expect(page.errors).toHaveLength(0);
   });
 
-  test('should navigate to Upstream Pulse module when clicked', async ({ page }) => {
-    await page.goto('/');
+  test('should remain directly routable while hidden', async ({ page }) => {
+    await page.goto('/#/upstream-pulse/dashboard');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // First, expand the Upstream Pulse module section if it's collapsed
-    const moduleHeader = page.locator('aside nav button').filter({ hasText: 'Upstream Pulse' }).first();
-    await moduleHeader.click();
-    await page.waitForTimeout(500);
-
-    // Now click on the "Dashboard" view within the module (default view)
-    const viewLink = page.locator('aside nav button').filter({ hasText: 'Dashboard' }).first();
-    await viewLink.click();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
-
-    // Verify URL changed to upstream-pulse module (default view is dashboard)
     expect(page.url()).toMatch(/upstream-pulse\/dashboard/);
-
-    // Verify main content is visible
     const mainContentVisible = await mainContentIsVisible(page);
     expect(mainContentVisible).toBe(true);
 

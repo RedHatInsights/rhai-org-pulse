@@ -106,6 +106,7 @@ COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
 
 # Add fixtures (for demo mode)
 COPY fixtures/ai-impact/ ./fixtures/ai-impact/
+COPY fixtures/jira-solve-agent/ ./fixtures/jira-solve-agent/
 
 USER 0
 
