@@ -8,6 +8,7 @@
   "requires": [],
   "client": {
     "entry": "./client/index.js",
+    "hideFromSidebar": true,
     "navItems": [
       { "id": "rhaiis", "label": "RHAIIS", "icon": "PackageOpen", "default": true },
       { "id": "rhel-ai", "label": "RHEL AI", "icon": "PackageOpen" },

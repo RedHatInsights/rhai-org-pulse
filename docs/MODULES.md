@@ -67,6 +67,9 @@ modules/your-module/
 | `requires` | No | Array of module slugs this module depends on (default: `[]`) |
 | `client.entry` | No | Path to frontend entry point |
 | `client.navItems` | No | Sidebar navigation items |
+| `client.flatNavigation` | No | Render the module's navigation items directly in the top-level sidebar instead of beneath a collapsible module header |
+| `client.hideFromSidebar` | No | Keep the module enabled and routable without rendering its module navigation in the sidebar |
+| `client.promotedNavItems` | No | Render selected module routes as direct top-level sidebar items after the module's normal position |
 | `client.settingsComponent` | No | Vue component for the Settings page |
 | `server.entry` | No | Path to backend entry point |
 

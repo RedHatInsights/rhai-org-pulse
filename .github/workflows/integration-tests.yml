@@ -37,6 +37,9 @@ jobs:
             ai-impact:
               - 'modules/ai-impact/**'
               - 'tests/integration/ai-impact.spec.js'
+            jira-solve-agent:
+              - 'modules/jira-solve-agent/**'
+              - 'tests/integration/jira-solve-agent.spec.js'
             system-health:
               - 'modules/system-health/**'
               - 'tests/integration/system-health.spec.js'
@@ -62,7 +65,7 @@ jobs:
         run: |
           # If shared test files changed, then test all modules
           if [ "${{ steps.filter.outputs.shared-test-files }}" == "true" ]; then
-            MODULES='["ai-impact", "system-health", "people-teams", "upstream-pulse", "tv-fv-delta"]'
+            MODULES='["ai-impact", "jira-solve-agent", "system-health", "people-teams", "upstream-pulse", "tv-fv-delta"]'
           else
             # Otherwise, use the modules that have direct changes
             MODULES='${{ steps.filter.outputs.changes }}'

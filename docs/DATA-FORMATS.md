@@ -573,6 +573,45 @@ Append-only log of team structure management actions. Entries are added by team,
 
 ---
 
+## Jira Solve Agent — Agentic CVE (`data/jira-solve-agent/cve-data.json`)
+
+Cached current-state snapshot of OCPBUGS Vulnerabilities carrying one or more
+tracked ARC labels. Jira computes the KPI counts; the issue list contains only
+the 100 most recently updated matches. `arc:negative` and `arc:not-shipped` are
+combined without double-counting an issue carrying both labels.
+
+```json
+{
+  "fetchedAt": "2026-09-10T12:00:00.000Z",
+  "metrics": {
+    "analyzed": 3,
+    "agenticPrs": 1,
+    "mergedPrs": 0,
+    "mergeRate": 0,
+    "metadataIssues": 1,
+    "falsePositivesAddressed": 2
+  },
+  "issues": [
+    {
+      "key": "OCPBUGS-90001",
+      "summary": "Example analyzed vulnerability",
+      "status": "Closed",
+      "resolution": "Done-Errata",
+      "vexJustification": null,
+      "priority": "Critical",
+      "created": "2026-08-01T12:00:00.000Z",
+      "updated": "2026-09-09T12:00:00.000Z",
+      "labels": ["arc:complete", "arc:automated-pr"],
+      "components": ["Example component"],
+      "assignee": "Demo Engineer"
+    }
+  ]
+}
+```
+
+Tracked KPI labels are `arc:complete`, `arc:automated-pr`,
+`arc:repo-unmapped`, `arc:negative`, and `arc:not-shipped`.
+
 ## AI Impact — RFE Data (`data/ai-impact/rfe-data.json`)
 
 Cached RFE issues fetched from Jira. The module's primary data file.

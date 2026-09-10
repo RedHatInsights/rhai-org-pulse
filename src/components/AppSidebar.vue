@@ -410,32 +410,51 @@ const navSections = computed(() => {
   // Built-in modules from manifests
   for (const manifest of props.builtInManifests) {
     const navItems = manifest.client?.navItems || []
-    sections.push({
-      id: manifest.slug,
-      label: '',
-      collapsible: true,
-      expanded: expandedSections.value[manifest.slug] || false,
-      headerLabel: manifest.name,
-      headerIcon: resolveIcon(manifest.icon),
-      items: navItems
-        .filter(item => {
-          if (item.requireCondition === 'in-app-mode' && props.teamDataSource !== 'in-app') return false
-          if (!item.requireRole) return true
-          if (props.isAdmin) return true
-          if (props.roles.includes(item.requireRole)) return true
-          // Fallback: team-admin sees manager items too
-          if (item.requireRole === 'manager' && (props.isTeamAdmin || props.isManager)) return true
-          if (item.requireRole === 'team-admin' && props.isTeamAdmin) return true
-          return false
-        })
-        .map(item => ({
+    const flatNavigation = manifest.client?.flatNavigation === true
+    if (manifest.client?.hideFromSidebar !== true) {
+      sections.push({
+        id: manifest.slug,
+        label: '',
+        collapsible: !flatNavigation,
+        expanded: expandedSections.value[manifest.slug] || false,
+        headerLabel: manifest.name,
+        headerIcon: resolveIcon(manifest.icon),
+        items: navItems
+          .filter(item => {
+            if (item.requireCondition === 'in-app-mode' && props.teamDataSource !== 'in-app') return false
+            if (!item.requireRole) return true
+            if (props.isAdmin) return true
+            if (props.roles.includes(item.requireRole)) return true
+            // Fallback: team-admin sees manager items too
+            if (item.requireRole === 'manager' && (props.isTeamAdmin || props.isManager)) return true
+            if (item.requireRole === 'team-admin' && props.isTeamAdmin) return true
+            return false
+          })
+          .map(item => ({
+            id: `${manifest.slug}::${item.id}`,
+            label: item.label,
+            icon: resolveIcon(item.icon),
+            ...(flatNavigation ? { moduleSlug: manifest.slug, viewId: item.id } : {}),
+            disabled: item.disabled || false,
+            separatorBefore: item.separatorBefore || false
+          }))
+      })
+    }
+
+    const promotedNavItems = manifest.client?.promotedNavItems || []
+    if (promotedNavItems.length > 0) {
+      sections.push({
+        id: `${manifest.slug}-promoted`,
+        label: '',
+        items: promotedNavItems.map(item => ({
           id: `${manifest.slug}::${item.id}`,
           label: item.label,
           icon: resolveIcon(item.icon),
-          disabled: item.disabled || false,
-          separatorBefore: item.separatorBefore || false
+          moduleSlug: manifest.slug,
+          viewId: item.id
         }))
-    })
+      })
+    }
   }
 
   // Git-static external modules
@@ -457,7 +476,7 @@ const navSections = computed(() => {
     items: [
       {
         id: 'repo-agent-readiness',
-        label: 'Agentic Readiness',
+        label: 'Agentic Repo Readiness',
         icon: GitBranch,
         href: 'https://fleet-insights.apps.engineering.openshift.org/hybrid-platforms/ocp/ai-enablement'
       },
@@ -491,6 +510,9 @@ const navSections = computed(() => {
 
 function isNavItemActive(item, section) {
   if (item.id === 'home') return props.activeModule === 'home'
+  if (item.moduleSlug) {
+    return props.activeModule === item.moduleSlug && props.activeViewId === item.viewId
+  }
   if (item.id.startsWith('modules/')) {
     const slug = item.id.slice('modules/'.length)
     return props.activeModule === 'module-iframe' && props.activeViewId === null && slug === props.activeModule
