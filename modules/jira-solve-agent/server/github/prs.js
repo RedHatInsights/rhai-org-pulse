@@ -69,7 +69,6 @@ const TEAM_REPOS = {
   networking: ['ovn-kubernetes', 'cluster-network-operator', 'multus-cni', 'ptp-operator'],
   etcd: ['etcd', 'cluster-etcd-operator'],
   storage: [
-    'lvm-operator',
     'local-storage-operator',
     'csi-operator',
     'secrets-store-csi-driver',
@@ -98,7 +97,30 @@ const TEAM_REPOS = {
   ],
   console: ['console', 'console-operator'],
   olm: ['operator-framework-olm', 'ansible-operator-plugins', 'kueue-operator'],
-  support: ['insights-operator', 'must-gather']
+  support: ['insights-operator', 'must-gather'],
+  // Edge & Ecosystem pillar — derived from gitlab.cee.redhat.com/hybrid-platforms/org.
+  // Repos already wired to another team (oc-mirror→cluster-lifecycle,
+  // installer→installer, hypershift→hypershift, etc.) are intentionally excluded.
+  // Non-openshift/ orgs (openshift-eng, openshift-metal3, okd-project) are excluded
+  // because the bot only targets openshift/ repositories.
+  'edge-ecosystem': [
+    // Edge
+    'lvm-operator', 'microshift',
+    // Application Platform (OAP)
+    'cert-manager-operator', 'secrets-store-csi-driver-operator',
+    'spire-operator', 'external-secrets-operator', 'must-gather-operator',
+    // CID
+    'mirror-gui',
+    // Multi Architecture
+    'multiarch-tuning-operator',
+    // Metal Platform
+    'ironic-image', 'ironic-agent-image', 'ironic-rhcos-downloader',
+    'cluster-api-provider-baremetal', 'cluster-api-provider-metal3',
+    'baremetal-operator', 'ironic-standalone-operator',
+    'machine-os-images', 'image-customization-controller',
+    'openstack-sushy', 'openstack-ironic', 'openstack-ironic-lib',
+    'openstack-ironic-python-agent', 'openstack-ironic-inspector'
+  ]
 };
 
 const REPO_TEAMS = Object.entries(TEAM_REPOS).flatMap(([team, repos]) =>
