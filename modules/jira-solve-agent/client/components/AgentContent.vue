@@ -272,7 +272,43 @@ const TEAMS = [
   { key: 'console', label: 'Console', components: ['Management Console'], projectPrefixes: ['CONSOLE'] },
   { key: 'olm', label: 'OLM & Operators', components: ['OLM'], projectPrefixes: ['OPRUN'] },
   { key: 'support', label: 'Support & Diagnostics', components: ['Insights Operator'], projectPrefixes: ['CCXDEV'] },
-  { key: 'edge-ecosystem', label: 'Edge & Ecosystem', components: [] },
+  {
+    key: 'edge-ecosystem',
+    label: 'Edge & Ecosystem',
+    // Derived from gitlab.cee.redhat.com/hybrid-platforms/org — all nested teams
+    // under the Edge & Ecosystem pillar (Edge, OAP, CID, OKD, MultiArch, Metal
+    // Platform, IBM System Enablement, SPLAT).
+    projectPrefixes: [
+      'OCPEDGE', 'USHIFT',                          // Edge
+      'OAPE', 'SSCSI', 'SPIRE', 'ESO',              // Application Platform (OAP)
+      'CLID',                                        // CID
+      'OKD',                                         // OKD
+      'MULTIARCH',                                   // Multi Architecture
+      'METAL',                                       // Metal Platform
+      'SPLAT', 'OPCT'                                // SPLAT
+    ],
+    components: [
+      // Edge
+      'MicroShift', 'Installer / Single Node OpenShift',
+      'Two Node Fencing', 'Two Node with Arbiter',
+      'Logical Volume Manager Storage',
+      'Topology Transitions',
+      // Application Platform (OAP)
+      'cert-manager', 'external-secrets-operator', 'secrets-store-csi-driver',
+      // CID
+      'oc-mirror', 'mirror-gui',
+      // Multi Architecture + IBM System Enablement
+      'Multi-Arch', 'Multiarch Tuning Operator',
+      'Multi-Arch / IBM P and Z', 'Installer / PowerVS',
+      // Metal Platform
+      'vcf-migration-operator'
+    ]
+  },
+  // Test-only placeholder — no components or prefixes, so it never matches
+  // real issues.  Lets tests exercise the no-repos tooltip path with a
+  // synthetic team name instead of relying on a real team that may gain or
+  // lose repos over time.
+  { key: 'lorem-ipsum', label: 'Lorem Ipsum', components: [] },
 ];
 
 // Table columns, in render order. Each `key` matches a SORTERS entry, so the

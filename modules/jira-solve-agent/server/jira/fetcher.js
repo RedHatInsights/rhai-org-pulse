@@ -1,6 +1,16 @@
 const { fetchAllJqlResults } = require('../../../../shared/server/jira');
 
-const PROJECTS = ['OCPBUGS', 'CNTRLPLANE', 'TRT', 'WINC', 'MCO', 'NE'];
+const PROJECTS = [
+  'OCPBUGS', 'CNTRLPLANE', 'TRT', 'WINC', 'MCO', 'NE',
+  // Edge & Ecosystem pillar — derived from gitlab.cee.redhat.com/hybrid-platforms/org
+  'OCPEDGE', 'USHIFT',                              // Edge
+  'OAPE', 'SSCSI', 'SPIRE', 'ESO',                  // Application Platform (OAP)
+  'CLID',                                            // CID
+  'OKD',                                             // OKD
+  'MULTIARCH',                                       // Multi Architecture
+  'METAL',                                           // Metal Platform
+  'SPLAT', 'OPCT'                                    // SPLAT
+];
 const AGENT_LABEL = 'issue-for-agent';
 const PROCESSED_LABEL = 'agent-processed';
 const READY_TO_SOLVE_LABEL = 'ready-to-solve';
