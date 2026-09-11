@@ -1020,6 +1020,33 @@ Metadata from the most recent fetch attempt.
 
 ---
 
+## CVE Triage — `data/cve-triage/data.json`
+
+Cached Jira issues grouped by the server into CVE solution metrics. The initial ARC solution stores all OCPBUGS issues labeled `arc:triaged`; `resolved` is true when the issue also has `arc:complete`.
+
+```json
+{
+  "fetchedAt": "2026-09-11T08:00:00.000Z",
+  "issues": [
+    {
+      "key": "OCPBUGS-60001",
+      "summary": "Example CVE triaged with ARC",
+      "status": "In Progress",
+      "updated": "2026-09-10T12:00:00.000Z",
+      "resolved": false
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `fetchedAt` | ISO string | Time of the most recent successful Jira refresh |
+| `issues` | object[] | OCPBUGS issues carrying the `arc:triaged` label |
+| `issues[].resolved` | boolean | Whether the issue also carries the `arc:complete` label |
+
+---
+
 ## Health Metrics — `data/health-metrics/`
 
 ### Usage Events — `data/health-metrics/events/YYYY-MM.jsonl`
