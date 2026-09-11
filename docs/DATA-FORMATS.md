@@ -1022,28 +1022,40 @@ Metadata from the most recent fetch attempt.
 
 ## CVE Triage — `data/cve-triage/data.json`
 
-Cached Jira issues grouped by the server into CVE solution metrics. The initial ARC solution stores all OCPBUGS issues labeled `arc:triaged`; `resolved` is true when the issue also has `arc:complete`.
+Cached Jira issues grouped by solution. ARC stores OCPBUGS issues labeled `arc:triaged`; `resolved` is true when the issue also has `arc:complete`. Sustaining Engineer CHAI stores Jira issues from any project labeled `chai-bot-analyzed`; `resolved` is true when Jira places the issue in its Done status category.
 
 ```json
 {
   "fetchedAt": "2026-09-11T08:00:00.000Z",
-  "issues": [
-    {
-      "key": "OCPBUGS-60001",
-      "summary": "Example CVE triaged with ARC",
-      "status": "In Progress",
-      "updated": "2026-09-10T12:00:00.000Z",
-      "resolved": false
-    }
-  ]
+  "solutions": {
+    "arc": [
+      {
+        "key": "OCPBUGS-60001",
+        "summary": "Example CVE triaged with ARC",
+        "status": "In Progress",
+        "updated": "2026-09-10T12:00:00.000Z",
+        "resolved": false
+      }
+    ],
+    "chai": [
+      {
+        "key": "OCPBUGS-60003",
+        "summary": "Example CVE analyzed by CHAI",
+        "status": "New",
+        "updated": "2026-09-11T09:00:00.000Z",
+        "resolved": false
+      }
+    ]
+  }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `fetchedAt` | ISO string | Time of the most recent successful Jira refresh |
-| `issues` | object[] | OCPBUGS issues carrying the `arc:triaged` label |
-| `issues[].resolved` | boolean | Whether the issue also carries the `arc:complete` label |
+| `solutions.arc` | object[] | OCPBUGS issues carrying the `arc:triaged` label |
+| `solutions.chai` | object[] | Jira issues carrying the `chai-bot-analyzed` label |
+| `solutions.*[].resolved` | boolean | Whether the solution-specific resolution condition is met |
 
 ---
 
