@@ -93,7 +93,8 @@ import {
   Bot,
   GitMerge,
   ListChecks,
-  Cloud
+  Cloud,
+  Shield
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -123,6 +124,12 @@ const strategicInitiatives = [
     description: 'Track agent-assisted bug candidates, attempts, acceptances, and the pull requests that land.',
     icon: Bot,
     target: 'jira-solve-agent'
+  },
+  {
+    title: 'Agentic CVE',
+    description: 'Track ARC analysis, agentic pull requests, metadata gaps, and false-positive resolution for vulnerabilities.',
+    icon: Shield,
+    target: 'jira-solve-agent::cve'
   },
   {
     title: 'Refinement Assistance',

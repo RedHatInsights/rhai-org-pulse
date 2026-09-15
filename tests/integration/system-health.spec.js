@@ -24,43 +24,22 @@ test.describe('System Health Module @system-health', () => {
     logCapturedErrors(page, testInfo);
   });
 
-  test('should be visible in sidebar navigation', async ({ page }) => {
+  test('should be hidden from sidebar navigation', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Find the System Health module in the sidebar
-    const moduleNav = page.locator('aside nav').filter({ hasText: 'System Health' });
-    const count = await moduleNav.count();
-    expect(count).toBeGreaterThan(0);
-
-    // Verify the module link is visible and clickable
-    const moduleLink = moduleNav.first();
-    await expect(moduleLink).toBeVisible();
+    await expect(page.locator('aside nav button[aria-label="System Health"]')).toHaveCount(0);
 
     expect(page.errors).toHaveLength(0);
   });
 
-  test('should navigate to System Health module when clicked', async ({ page }) => {
-    await page.goto('/');
+  test('should remain directly routable while hidden', async ({ page }) => {
+    await page.goto('/#/system-health/quality-analysis');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // First, expand the System Health module section if it's collapsed
-    const moduleHeader = page.locator('aside nav button').filter({ hasText: 'System Health' }).first();
-    await moduleHeader.click();
-    await page.waitForTimeout(500);
-
-    // Now click on the "Quality analysis" view within the module
-    const viewLink = page.locator('aside nav button').filter({ hasText: 'Quality analysis' }).first();
-    await viewLink.click();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
-
-    // Verify URL changed to system-health module (default view is quality-analysis)
     expect(page.url()).toMatch(/system-health\/quality-analysis/);
-
-    // Verify main content is visible
     const mainContentVisible = await mainContentIsVisible(page);
     expect(mainContentVisible).toBe(true);
 

@@ -7,6 +7,7 @@ const {
 } = require('./jira/fetcher');
 const { fetchAgentPrs, hydrateLinkedPrStates, TEAM_REPOS } = require('./github/prs');
 const { fetchLinkedPrsForKeys } = require('./jira/remote-links');
+const { computeCveMetrics, fetchCveSnapshot, JQL: CVE_JQL } = require('./jira/cve-fetcher');
 
 /**
  * @param {import('express').Router} router
@@ -137,6 +138,28 @@ module.exports = function registerRoutes(router, context) {
     });
   });
 
+  /**
+   * @openapi
+   * /api/modules/jira-solve-agent/cve-data:
+   *   get:
+   *     tags: [OpenShift Jira Solve Agent]
+   *     summary: Get cached ARC analysis metrics for OCPBUGS Vulnerabilities
+   *     responses:
+   *       200:
+   *         description: Agentic CVE metrics and matching Vulnerability issues
+   */
+  router.get('/cve-data', requireScope('jira-solve-agent:read'), function(req, res) {
+    const data = readFromStorage('jira-solve-agent/cve-data.json');
+    const issues = data && Array.isArray(data.issues) ? data.issues : [];
+    res.json({
+      fetchedAt: data ? data.fetchedAt : null,
+      jiraHost: JIRA_HOST,
+      metrics: data && data.metrics ? data.metrics : computeCveMetrics(issues),
+      jql: CVE_JQL,
+      issues
+    });
+  });
+
   const refreshState = { running: false, lastResult: null };
 
   /**
@@ -170,6 +193,54 @@ module.exports = function registerRoutes(router, context) {
       refreshState.running = false;
     }
   });
+
+  const cveRefreshState = { running: false, lastResult: null };
+
+  /**
+   * @openapi
+   * /api/modules/jira-solve-agent/cve-refresh:
+   *   post:
+   *     tags: [OpenShift Jira Solve Agent]
+   *     summary: Refresh ARC analysis data for OCPBUGS Vulnerabilities
+   *     responses:
+   *       200:
+   *         description: Agentic CVE refresh completed
+   *       409:
+   *         description: Refresh already running
+   */
+  router.post('/cve-refresh', requireAdmin, requireScope('jira-solve-agent:write'), async function(req, res) {
+    if (cveRefreshState.running) {
+      return res.status(409).json({ error: 'CVE refresh already running' });
+    }
+
+    cveRefreshState.running = true;
+    try {
+      await runCveRefresh();
+      res.json({ status: 'ok', result: cveRefreshState.lastResult });
+    } catch (err) {
+      console.error('[jira-solve-agent] CVE refresh failed:', err);
+      cveRefreshState.lastResult = {
+        status: 'error',
+        message: err.message,
+        completedAt: new Date().toISOString()
+      };
+      res.status(500).json({ error: err.message });
+    } finally {
+      cveRefreshState.running = false;
+    }
+  });
+
+  async function runCveRefresh() {
+    if (DEMO_MODE) return;
+    const snapshot = await fetchCveSnapshot(jiraRequest);
+    const fetchedAt = new Date().toISOString();
+    writeToStorage('jira-solve-agent/cve-data.json', { fetchedAt, ...snapshot });
+    cveRefreshState.lastResult = {
+      status: 'ok',
+      issueCount: snapshot.issues.length,
+      completedAt: fetchedAt
+    };
+  }
 
   async function runRefresh() {
     if (DEMO_MODE) return;
@@ -265,14 +336,22 @@ module.exports = function registerRoutes(router, context) {
         await runRefresh();
       }
     });
+    context.registerRefresh('cve-refresh', {
+      order: 61,
+      timeout: 120000,
+      handler: runCveRefresh
+    });
   }
 
   context.registerDiagnostics(async function() {
     const data = readFromStorage('jira-solve-agent/data.json');
+    const cveData = readFromStorage('jira-solve-agent/cve-data.json');
     return {
-      status: data && data.issues ? 'ok' : 'no-data',
+      status: data && data.issues && cveData && cveData.issues ? 'ok' : 'no-data',
       issueCount: data && data.issues ? data.issues.length : 0,
-      fetchedAt: data ? data.fetchedAt : null
+      fetchedAt: data ? data.fetchedAt : null,
+      cveIssueCount: cveData && cveData.issues ? cveData.issues.length : 0,
+      cveFetchedAt: cveData ? cveData.fetchedAt : null
     };
   });
 };

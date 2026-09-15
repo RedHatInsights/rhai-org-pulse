@@ -10,6 +10,7 @@ FROM quay.io/org-pulse/org-pulse-core-frontend-builder:${CORE_TAG} AS build
 
 # Add AI Eng modules
 COPY modules/ai-impact/ ./modules/ai-impact/
+COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
 COPY modules/releases/ ./modules/releases/
 COPY modules/upstream-pulse/ ./modules/upstream-pulse/
 COPY modules/product-builds/ ./modules/product-builds/

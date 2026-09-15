@@ -60,7 +60,9 @@ function setup({ token = 'gh-token', initialData = null } = {}) {
       deleteFromStorage: () => {}
     },
     secrets: { JIRA_EMAIL: 'a@b.com', JIRA_TOKEN: 't', GITHUB_TOKEN: token },
-    registerRefresh: (_id, cfg) => { refreshHandler = cfg.handler; }
+    registerRefresh: (id, cfg) => {
+      if (id === 'refresh') refreshHandler = cfg.handler;
+    }
   });
 
   const registerRoutes = loadIndex();

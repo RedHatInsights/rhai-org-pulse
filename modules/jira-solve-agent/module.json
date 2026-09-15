@@ -1,13 +1,17 @@
 {
-  "name": "OpenShift Jira Solve Agent",
+  "name": "Agentic Bugfixes",
   "slug": "jira-solve-agent",
   "description": "Track the progress and adoption of OpenShift Jira Solve Agent",
   "icon": "bot",
   "order": 10,
   "client": {
     "entry": "./client/index.js",
+    "flatNavigation": true,
+    "promotedNavItems": [
+      { "id": "cve", "label": "Agentic CVE", "icon": "Shield" }
+    ],
     "navItems": [
-      { "id": "main", "label": "OpenShift Jira Solve Agent", "icon": "Bot", "default": true }
+      { "id": "main", "label": "Agentic Bugfixes", "icon": "Bot", "default": true }
     ]
   },
   "server": {

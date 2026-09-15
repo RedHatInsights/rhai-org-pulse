@@ -6,6 +6,7 @@
   "order": 10,
   "client": {
     "entry": "./client/index.js",
+    "hideFromSidebar": true,
     "navItems": [
       { "id": "dashboard", "label": "Dashboard", "icon": "BarChart3", "default": true },
       { "id": "insights", "label": "Insights", "icon": "Lightbulb" },

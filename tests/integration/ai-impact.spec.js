@@ -55,13 +55,7 @@ test.describe('AI Impact Module @ai-impact', () => {
 
 });
 
-/**
- * Disabled Menu Items
- * 
- * Verify that disabled components display as non-clickable, disabled (aka 
- * "greyed out") options.
- */
-test.describe('AI Impact Disabled Menu Items @ai-impact', () => {
+test.describe('AI Impact Sidebar Visibility @ai-impact', () => {
   test.beforeEach(async ({ page }) => {
     setupErrorTracking(page);
   });
@@ -70,58 +64,17 @@ test.describe('AI Impact Disabled Menu Items @ai-impact', () => {
     logCapturedErrors(page, testInfo);
   });
 
-  // Helper to test a disabled menu item
-  async function testDisabledMenuItem(page, itemLabel) {
-    await page.goto('/#/ai-impact/ai-factory-guide');
+  test('hides the module menu while promoting Agentic RFE Review', async ({ page }) => {
+    await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(DEFAULT_PAGE_WAIT_TIME);
 
-    // Find the disabled item in the navigation by its title (display text)
-    // Navigation items are rendered as buttons in the sidebar
-    const navItem = page.locator('aside nav button').filter({ hasText: itemLabel });
-    const count = await navItem.count();
-    expect(count).toBeGreaterThan(0);
-    const disabledItem = navItem.first();
-
-    // Verify it's disabled (check for disabled attribute, aria-disabled, or
-    // opacity/cursor styling)
-    const isAriaDisabled = await disabledItem.getAttribute('aria-disabled');
-    const hasDisabledClass = await disabledItem.evaluate(el => {
-      const classes = el.className || '';
-      // Common patterns for disabled items: opacity, cursor, pointer-events
-      return classes.includes('disabled') ||
-             classes.includes('opacity-') ||
-             window.getComputedStyle(el).cursor === 'not-allowed' ||
-             window.getComputedStyle(el).pointerEvents === 'none';
-    });
-
-    // At least one disabled indicator should be present
-    const isDisabled = isAriaDisabled === 'true' || hasDisabledClass;
-    expect(isDisabled).toBe(true);
-
-    // Verify it's truly non-interactive by attempting to click
-    // and ensure navigation doesn't occur
-    const urlBeforeClick = page.url();
-    await disabledItem.click({ force: true }).catch(() => {
-      // Click might fail if pointer-events: none, that's expected
-    });
-    await page.waitForTimeout(500);
-
-    // Verify the URL hasn't changed (i.e., no navigation occurred)
-    const urlAfterClick = page.url();
-    expect(urlAfterClick).toBe(urlBeforeClick);
-
+    await expect(page.locator('aside nav button[aria-label="AI Impact"]')).toHaveCount(0);
+    await expect(page.locator('aside nav button[aria-label="Implementation"]')).toHaveCount(0);
+    await expect(page.locator('aside nav button[aria-label="Security Review"]')).toHaveCount(0);
+    await expect(page.locator('aside nav button[aria-label="Agentic RFE Review"]')).toBeVisible();
     expect(page.errors).toHaveLength(0);
-  }
-
-  test('Implementation menu item should be disabled', async ({ page }) => {
-    await testDisabledMenuItem(page, 'Implementation');
   });
-
-  test('Security Review menu item should be disabled', async ({ page }) => {
-    await testDisabledMenuItem(page, 'Security Review');
-  });
-
 });
 
 /**
