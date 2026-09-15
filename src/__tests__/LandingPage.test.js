@@ -19,6 +19,7 @@ describe('LandingPage', () => {
     expect(wrapper.text()).toContain('What is Org Pulse?')
     expect(wrapper.text()).toContain("Hybrid Platforms' agentic evolution")
     expect(wrapper.text()).toContain('Agentic Bug Fixes')
+    expect(wrapper.text()).toContain('CVE Triage')
     expect(wrapper.text()).toContain('Agentic Backports')
     expect(wrapper.text()).toContain('Agentic Team, Engineer & Repo Structure')
     expect(wrapper.text()).toContain('Refinement Assistance')
@@ -29,8 +30,9 @@ describe('LandingPage', () => {
       'Agentic Team, Engineer & Repo Structure',
       'Repo-level Agent Readiness',
       'Agentic Bug Fixes',
-      'Refinement Assistance',
       'Agentic Backports',
+      'CVE Triage',
+      'Refinement Assistance',
       'HyperShell'
     ])
     expect(wrapper.text()).not.toContain('Built-in Modules')
@@ -45,6 +47,15 @@ describe('LandingPage', () => {
     await initiative.trigger('click')
 
     expect(wrapper.emitted('navigate')).toContainEqual(['jira-solve-agent'])
+  })
+
+  it('navigates from CVE Triage to its solution dashboard', async () => {
+    const wrapper = mountPage()
+    const initiative = wrapper.findAll('button').find(button => button.text().includes('Tracks CVE triaging'))
+
+    await initiative.trigger('click')
+
+    expect(wrapper.emitted('navigate')).toContainEqual(['cve-triage'])
   })
 
   it('navigates from team structure to Team Tracker home', async () => {

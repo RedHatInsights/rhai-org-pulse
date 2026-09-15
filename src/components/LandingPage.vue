@@ -91,6 +91,7 @@ import {
   Sparkles,
   Hospital,
   Bot,
+  ShieldCheck,
   GitMerge,
   ListChecks,
   Cloud
@@ -125,17 +126,23 @@ const strategicInitiatives = [
     target: 'jira-solve-agent'
   },
   {
+    title: 'Agentic Backports',
+    description: 'Bring agentic assistance to identifying, preparing, and validating release backports.',
+    icon: GitMerge,
+    status: 'TBD'
+  },
+  {
+    title: 'CVE Triage',
+    description: 'Tracks CVE triaging and resolution across solution approaches.',
+    icon: ShieldCheck,
+    target: 'cve-triage'
+  },
+  {
     title: 'Refinement Assistance',
     description: 'ValorFlow assists backlog refinement and helps work become implementation-ready.',
     icon: ListChecks,
     href: 'https://valorflow.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com/',
     status: 'External'
-  },
-  {
-    title: 'Agentic Backports',
-    description: 'Bring agentic assistance to identifying, preparing, and validating release backports.',
-    icon: GitMerge,
-    status: 'TBD'
   },
   {
     title: 'HyperShell',
