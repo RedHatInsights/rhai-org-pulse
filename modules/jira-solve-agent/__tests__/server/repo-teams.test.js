@@ -51,6 +51,32 @@ describe('REPO_TEAMS', () => {
     expect(REPO_TEAM_BY_NAME['openshift/cincinnati-graph-data']).toBe('ota')
   })
 
+  it('wires Edge & Ecosystem repos to edge-ecosystem', () => {
+    // Edge
+    expect(REPO_TEAM_BY_NAME['openshift/microshift']).toBe('edge-ecosystem')
+    expect(REPO_TEAM_BY_NAME['openshift/lvm-operator']).toBe('edge-ecosystem')
+    // OAP
+    expect(REPO_TEAM_BY_NAME['openshift/cert-manager-operator']).toBe('edge-ecosystem')
+    expect(REPO_TEAM_BY_NAME['openshift/external-secrets-operator']).toBe('edge-ecosystem')
+    // Metal Platform
+    expect(REPO_TEAM_BY_NAME['openshift/baremetal-operator']).toBe('edge-ecosystem')
+    expect(REPO_TEAM_BY_NAME['openshift/ironic-image']).toBe('edge-ecosystem')
+    // Multi Architecture
+    expect(REPO_TEAM_BY_NAME['openshift/multiarch-tuning-operator']).toBe('edge-ecosystem')
+    // CID
+    expect(REPO_TEAM_BY_NAME['openshift/mirror-gui']).toBe('edge-ecosystem')
+  })
+
+  it('does not double-claim repos already assigned to other teams', () => {
+    // These repos belong to the Edge & Ecosystem pillar in the org data but
+    // are already wired to a different team in this module.
+    expect(REPO_TEAM_BY_NAME['openshift/secrets-store-csi-driver']).toBe('storage')
+    expect(REPO_TEAM_BY_NAME['openshift/oc-mirror']).toBe('cluster-lifecycle')
+    expect(REPO_TEAM_BY_NAME['openshift/installer']).toBe('installer')
+    expect(REPO_TEAM_BY_NAME['openshift/hypershift']).toBe('hypershift')
+    expect(REPO_TEAM_BY_NAME['openshift/must-gather']).toBe('support')
+  })
+
   it('excludes the SRE-platform and lightspeed repos', () => {
     const excluded = [
       'osd-network-verifier', 'managed-cluster-config', 'managed-cluster-validating-webhooks',

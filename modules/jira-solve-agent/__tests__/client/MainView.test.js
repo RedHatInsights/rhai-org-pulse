@@ -11,13 +11,14 @@ describe('AgentContent', () => {
       installer: ['installer'],
       trt: ['sippy', 'origin'],
       mco: ['machine-config-operator', 'os'],
-      ota: ['cluster-version-operator', 'cincinnati-graph-data']
+      ota: ['cluster-version-operator', 'cincinnati-graph-data'],
+      'edge-ecosystem': ['microshift', 'lvm-operator', 'baremetal-operator']
     },
     metrics: {
-      totalIssues: 10,
+      totalIssues: 14,
       byState: { new: 2, 'ready-to-solve': 0, 'in-progress': 1, closed: 1 },
       processedCount: 1,
-      processedRate: 10
+      processedRate: 7
     },
     issues: [
       { key: 'OCPBUGS-1', summary: 'HyperShift bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-01', updated: '2026-07-07', labels: [], components: ['HyperShift'], assignee: null, linkedPrs: [{ repo: 'openshift/hypershift', team: 'hypershift', number: 9137, url: 'https://github.com/openshift/hypershift/pull/9137', state: 'OPEN', author: 'x' }, { repo: 'openshift/origin', team: 'trt', number: 31382, url: 'https://github.com/openshift/origin/pull/31382', state: 'CLOSED', author: 'y' }] },
@@ -29,7 +30,11 @@ describe('AgentContent', () => {
       { key: 'MCO-12', summary: 'MCO bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-05', updated: '2026-07-07', labels: [], components: [], assignee: null },
       { key: 'OCPBUGS-4', summary: 'MCO component bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-05', updated: '2026-07-07', labels: [], components: ['Machine Config Operator'], assignee: null },
       { key: 'NE-7', summary: 'Ingress bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-05', updated: '2026-07-07', labels: [], components: [], assignee: null },
-      { key: 'OCPBUGS-5', summary: 'Ingress component bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-05', updated: '2026-07-07', labels: [], components: ['Networking / router'], assignee: null }
+      { key: 'OCPBUGS-5', summary: 'Ingress component bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-05', updated: '2026-07-07', labels: [], components: ['Networking / router'], assignee: null },
+      { key: 'OCPEDGE-20', summary: 'Edge pillar feature', status: 'New', agentState: 'new', processed: false, issueType: 'Story', priority: 'Major', created: '2026-07-06', updated: '2026-07-07', labels: [], components: [], assignee: null },
+      { key: 'OCPBUGS-6', summary: 'MicroShift component bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-06', updated: '2026-07-07', labels: [], components: ['MicroShift'], assignee: null },
+      { key: 'METAL-3', summary: 'Metal platform story', status: 'New', agentState: 'new', processed: false, issueType: 'Story', priority: 'Major', created: '2026-07-06', updated: '2026-07-07', labels: [], components: [], assignee: null },
+      { key: 'OCPBUGS-7', summary: 'VCF migration operator bug', status: 'New', agentState: 'new', processed: false, issueType: 'Bug', priority: 'Major', created: '2026-07-06', updated: '2026-07-07', labels: [], components: ['vcf-migration-operator'], assignee: null }
     ]
   }
 
@@ -37,10 +42,10 @@ describe('AgentContent', () => {
     const wrapper = mount(AgentContent, {
       props: { agentData: sampleData, loading: false, error: null }
     })
-    expect(wrapper.text()).toContain('10')
+    expect(wrapper.text()).toContain(String(sampleData.metrics.totalIssues))
     expect(wrapper.text()).toContain('Total Issues')
     expect(wrapper.text()).toContain('Ready to Solve')
-    expect(wrapper.text()).toContain('10%')
+    expect(wrapper.text()).toContain(sampleData.metrics.processedRate + '%')
   })
 
   it('renders the issue table with Key, Summary, PR Status and Jira Status columns', () => {
@@ -183,6 +188,29 @@ describe('AgentContent', () => {
     expect(wrapper.text()).toContain('NE-7')
     expect(wrapper.text()).toContain('Ingress component bug')
     expect(wrapper.text()).not.toContain('OCPBUGS-1')
+  })
+
+  it('filters Edge & Ecosystem issues by project prefix and component', async () => {
+    const wrapper = mount(AgentContent, {
+      props: { agentData: sampleData, loading: false, error: null }
+    })
+    const buttons = wrapper.findAll('button')
+    const edgeBtn = buttons.find(b => b.text().includes('Edge & Ecosystem'))
+    await edgeBtn.trigger('click')
+
+    // OCPEDGE prefix match
+    expect(wrapper.text()).toContain('OCPEDGE-20')
+    // MicroShift component match
+    expect(wrapper.text()).toContain('OCPBUGS-6')
+    expect(wrapper.text()).toContain('MicroShift component bug')
+    // METAL prefix match
+    expect(wrapper.text()).toContain('METAL-3')
+    // vcf-migration-operator component match
+    expect(wrapper.text()).toContain('OCPBUGS-7')
+    expect(wrapper.text()).toContain('VCF migration operator bug')
+    // Issues from other teams excluded
+    expect(wrapper.text()).not.toContain('OCPBUGS-1')
+    expect(wrapper.text()).not.toContain('CNTRLPLANE-10')
   })
 
 
@@ -405,7 +433,8 @@ describe('AgentContent', () => {
       // De-duplicated and sorted across all teams.
       expect(tip.text()).toContain('cincinnati-graph-data')
       expect(tip.text()).toContain('sippy')
-      expect(tip.text()).toContain('8 repos')
+      expect(tip.text()).toContain('microshift')
+      expect(tip.text()).toContain('11 repos')
     })
 
     it('uses the singular label for a one-repo team', () => {
@@ -417,12 +446,30 @@ describe('AgentContent', () => {
       expect(tip.text()).not.toContain('1 repos')
     })
 
-    it('renders no tooltip for a team with no repos wired up', () => {
+    it('lists Edge & Ecosystem repos in its tooltip', () => {
       const wrapper = mount(AgentContent, {
         props: { agentData: sampleData, loading: false, error: null }
       })
-      // edge-ecosystem has no repos in teamRepos.
       const btn = teamButton(wrapper, 'Edge & Ecosystem')
+      const tip = btn.find('[role="tooltip"]')
+      expect(tip.exists()).toBe(true)
+      expect(tip.text()).toContain('microshift')
+      expect(tip.text()).toContain('lvm-operator')
+      expect(tip.text()).toContain('baremetal-operator')
+      expect(tip.text()).toContain('3 repos')
+    })
+
+    it('hides tooltip for a team with no repos in teamRepos', () => {
+      // Use the synthetic "Lorem Ipsum" team (no components/prefixes)
+      // so this test never depends on a real team's repo assignments.
+      const data = {
+        ...sampleData,
+        teamRepos: { ...sampleData.teamRepos, 'lorem-ipsum': [] }
+      }
+      const wrapper = mount(AgentContent, {
+        props: { agentData: data, loading: false, error: null }
+      })
+      const btn = teamButton(wrapper, 'Lorem Ipsum')
       expect(btn.find('[role="tooltip"]').exists()).toBe(false)
       expect(btn.attributes('aria-describedby')).toBeUndefined()
     })
