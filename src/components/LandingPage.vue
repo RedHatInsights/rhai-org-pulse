@@ -129,7 +129,7 @@ const strategicInitiatives = [
     title: 'Agentic Backports',
     description: 'Bring agentic assistance to identifying, preparing, and validating release backports.',
     icon: GitMerge,
-    status: 'TBD'
+    target: 'backport-tracker'
   },
   {
     title: 'CVE Triage',

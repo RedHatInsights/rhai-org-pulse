@@ -3,7 +3,8 @@ const {
   fetchAgentData,
   computeMetrics,
   dedupeAgentWork,
-  fetchIssueStatusesByKeys
+  fetchIssueStatusesByKeys,
+  CHAI_BACKPORT_LABEL
 } = require('./jira/fetcher');
 const { fetchAgentPrs, hydrateLinkedPrStates, TEAM_REPOS } = require('./github/prs');
 const { fetchLinkedPrsForKeys } = require('./jira/remote-links');
@@ -187,12 +188,32 @@ module.exports = function registerRoutes(router, context) {
       }
     }
 
-    // 3. De-duplicate the bot PRs against the tracked Jira issues. Overlapping
+    // 3. Resolve Jira keys before de-duplication. Backport issues belong to the
+    //    backport tracker even when the same Chai bot account opened the PR.
+    let statusByKey = new Map();
+    const botPrKeys = botPrs.map(pr => pr.jiraKey).filter(Boolean);
+    if (botPrKeys.length) {
+      try {
+        statusByKey = await fetchIssueStatusesByKeys(jiraRequest, botPrKeys);
+        botPrs = botPrs.filter(pr => {
+          if (!pr.jiraKey) return true;
+          const issue = statusByKey.get(pr.jiraKey);
+          return issue && !issue.labels.includes(CHAI_BACKPORT_LABEL);
+        });
+      } catch (err) {
+        console.warn(`[jira-solve-agent] Failed to classify bot PR Jira keys: ${err.message}`);
+        // Do not let keyed PRs leak into Jira Solve when Jira cannot prove they
+        // are unrelated to the backport workflow. Keyless PRs remain safe.
+        botPrs = botPrs.filter(pr => !pr.jiraKey);
+      }
+    }
+
+    // 4. De-duplicate the remaining bot PRs against the tracked Jira issues. Overlapping
     //    PRs are already represented by their Jira issue; net-new-keyed and
     //    no-key PRs each become their own row that counts toward the total.
     const dedup = dedupeAgentWork(jiraIssues, botPrs);
 
-    // 4. Linked PRs from Jira remote issue links (GitHub-for-Jira integration).
+    // 5. Linked PRs from Jira remote issue links (GitHub-for-Jira integration).
     const keysForLinkedPrs = [
       ...jiraIssues.map(i => i.key),
       ...dedup.netNewKeyedPrs.map(pr => pr.jiraKey).filter(Boolean)
@@ -213,18 +234,7 @@ module.exports = function registerRoutes(router, context) {
       console.warn(`[jira-solve-agent] Remote-link sweep failed: ${err.message}`);
     }
 
-    // 5. For net-new-keyed PRs, look up the live Jira status so the row is
-    //    accurate. NO-JIRA rows need no lookup.
-    let statusByKey = new Map();
-    const netNewKeys = dedup.netNewKeyedPrs.map(pr => pr.jiraKey);
-    if (netNewKeys.length) {
-      try {
-        statusByKey = await fetchIssueStatusesByKeys(jiraRequest, netNewKeys);
-      } catch (err) {
-        console.warn(`[jira-solve-agent] Failed to fetch statuses for net-new PR keys: ${err.message}`);
-      }
-    }
-
+    // 6. Reuse that Jira metadata to populate net-new keyed rows.
     const keyedRows = dedup.netNewKeyedPrs.map(pr => rowFromKeyedPr(pr, statusByKey));
     for (const row of keyedRows) {
       const linked = linkedByKey.get(row.key);

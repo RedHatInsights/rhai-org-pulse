@@ -14,6 +14,7 @@ const PROJECTS = [
 const AGENT_LABEL = 'issue-for-agent';
 const PROCESSED_LABEL = 'agent-processed';
 const READY_TO_SOLVE_LABEL = 'ready-to-solve';
+const CHAI_BACKPORT_LABEL = 'chai-backport';
 
 const FIELDS = 'summary,status,issuetype,priority,created,updated,labels,components,assignee';
 
@@ -80,7 +81,7 @@ function computeMetrics(issues) {
 
 async function fetchAgentData(jiraRequest) {
   const projectClause = PROJECTS.map(p => `"${p}"`).join(', ');
-  const jql = `project IN (${projectClause}) AND labels = "${AGENT_LABEL}" ORDER BY created DESC`;
+  const jql = `project IN (${projectClause}) AND labels = "${AGENT_LABEL}" AND labels != "${CHAI_BACKPORT_LABEL}" ORDER BY created DESC`;
 
   const rawIssues = await fetchAllJqlResults(jiraRequest, jql, FIELDS);
   return rawIssues.map(processIssue);
@@ -170,7 +171,7 @@ function dedupeAgentWork(issues, prs) {
  * @param {Function} jiraRequest
  * @param {string[]} keys
  * @param {number} [batchSize=50]
- * @returns {Promise<Map<string, {status:string, assignee:string|null}>>}
+ * @returns {Promise<Map<string, {status:string, assignee:string|null, labels:string[]}>>}
  */
 async function fetchIssueStatusesByKeys(jiraRequest, keys, batchSize = 50) {
   const result = new Map();
@@ -180,13 +181,14 @@ async function fetchIssueStatusesByKeys(jiraRequest, keys, batchSize = 50) {
   for (let i = 0; i < distinct.length; i += batchSize) {
     const batch = distinct.slice(i, i + batchSize);
     const jql = `key IN (${batch.join(', ')})`;
-    const rawIssues = await fetchAllJqlResults(jiraRequest, jql, 'status,assignee');
+    const rawIssues = await fetchAllJqlResults(jiraRequest, jql, 'status,assignee,labels');
     for (const issue of rawIssues) {
       if (!issue || !issue.key) continue;
       const fields = issue.fields || {};
       result.set(issue.key, {
         status: fields.status?.name || 'Unknown',
-        assignee: fields.assignee?.displayName || null
+        assignee: fields.assignee?.displayName || null,
+        labels: fields.labels || []
       });
     }
   }
@@ -204,5 +206,6 @@ module.exports = {
   PROJECTS,
   AGENT_LABEL,
   PROCESSED_LABEL,
-  READY_TO_SOLVE_LABEL
+  READY_TO_SOLVE_LABEL,
+  CHAI_BACKPORT_LABEL
 };

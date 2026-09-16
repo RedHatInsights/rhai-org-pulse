@@ -29,6 +29,7 @@ FROM core-build AS build
 COPY modules/ai-impact/ ./modules/ai-impact/
 COPY modules/cve-triage/ ./modules/cve-triage/
 COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
+COPY modules/backport-tracker/ ./modules/backport-tracker/
 
 RUN npm run build
 

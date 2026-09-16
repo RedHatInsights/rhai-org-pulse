@@ -104,10 +104,12 @@ FROM core
 COPY modules/ai-impact/ ./modules/ai-impact/
 COPY modules/cve-triage ./modules/cve-triage/
 COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
+COPY modules/backport-tracker/ ./modules/backport-tracker/
 
 # Add fixtures (for demo mode)
 COPY fixtures/ai-impact/ ./fixtures/ai-impact/
 COPY fixtures/cve-triage ./fixtures/cve-triage/
+COPY fixtures/backport-tracker/ ./fixtures/backport-tracker/
 
 USER 0
 
