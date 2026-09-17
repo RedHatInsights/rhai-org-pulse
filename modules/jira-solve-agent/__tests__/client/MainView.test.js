@@ -460,16 +460,16 @@ describe('AgentContent', () => {
     })
 
     it('hides tooltip for a team with no repos in teamRepos', () => {
-      // Use the synthetic "Lorem Ipsum" team (no components/prefixes)
-      // so this test never depends on a real team's repo assignments.
+      // Clear a known team's repos so this test does not depend on any
+      // team's real repository assignments.
       const data = {
         ...sampleData,
-        teamRepos: { ...sampleData.teamRepos, 'lorem-ipsum': [] }
+        teamRepos: { ...sampleData.teamRepos, mco: [] }
       }
       const wrapper = mount(AgentContent, {
         props: { agentData: data, loading: false, error: null }
       })
-      const btn = teamButton(wrapper, 'Lorem Ipsum')
+      const btn = teamButton(wrapper, 'MCO')
       expect(btn.find('[role="tooltip"]').exists()).toBe(false)
       expect(btn.attributes('aria-describedby')).toBeUndefined()
     })
