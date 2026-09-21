@@ -1022,7 +1022,7 @@ Metadata from the most recent fetch attempt.
 
 ## CVE Triage — `data/cve-triage/data.json`
 
-Cached Jira issues grouped by solution. ARC stores OCPBUGS issues labeled `arc:triaged`; `resolved` is true when the issue also has `arc:complete`. Sustaining Engineer CHAI stores Jira issues from any project labeled `chai-bot-analyzed`; `resolved` is true when Jira places the issue in its Done status category.
+Cached Jira issues grouped by solution. ARC stores OCPBUGS issues labeled `arc:triaged`; `resolved` is true when the issue also has `arc:complete`. Sustaining Engineer CHAI stores Jira issues from any project labeled `chai-bot-analyzed`; `resolved` is true when Jira places the issue in its Done status category. OAPE CHAI stores Jira issues from any project labeled `ai-cve-analyzed`; `resolved` is true when Jira places the issue in its Done status category.
 
 ```json
 {
@@ -1045,6 +1045,15 @@ Cached Jira issues grouped by solution. ARC stores OCPBUGS issues labeled `arc:t
         "updated": "2026-09-11T09:00:00.000Z",
         "resolved": false
       }
+    ],
+    "oapeChai": [
+      {
+        "key": "OCPBUGS-60005",
+        "summary": "Example CVE analyzed by OAPE CHAI",
+        "status": "New",
+        "updated": "2026-09-11T10:00:00.000Z",
+        "resolved": false
+      }
     ]
   }
 }
@@ -1055,6 +1064,7 @@ Cached Jira issues grouped by solution. ARC stores OCPBUGS issues labeled `arc:t
 | `fetchedAt` | ISO string | Time of the most recent successful Jira refresh |
 | `solutions.arc` | object[] | OCPBUGS issues carrying the `arc:triaged` label |
 | `solutions.chai` | object[] | Jira issues carrying the `chai-bot-analyzed` label |
+| `solutions.oapeChai` | object[] | Jira issues carrying the `ai-cve-analyzed` label |
 | `solutions.*[].resolved` | boolean | Whether the solution-specific resolution condition is met |
 
 ---
