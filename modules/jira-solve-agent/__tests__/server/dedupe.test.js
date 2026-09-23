@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-const { dedupeAgentWork, fetchIssueStatusesByKeys } = require('../../server/jira/fetcher')
+const { dedupeAgentWork, fetchAgentData, fetchIssueStatusesByKeys } = require('../../server/jira/fetcher')
 const { extractJiraKey } = require('../../server/github/prs')
 
 describe('extractJiraKey', () => {
@@ -121,8 +121,8 @@ describe('fetchIssueStatusesByKeys', () => {
       'MCO-5': { status: { name: 'Closed' }, assignee: null }
     })
     const m = await fetchIssueStatusesByKeys(jiraRequest, ['OCPBUGS-1', 'MCO-5'])
-    expect(m.get('OCPBUGS-1')).toEqual({ status: 'In Progress', assignee: 'Ada' })
-    expect(m.get('MCO-5')).toEqual({ status: 'Closed', assignee: null })
+    expect(m.get('OCPBUGS-1')).toEqual({ status: 'In Progress', assignee: 'Ada', labels: [] })
+    expect(m.get('MCO-5')).toEqual({ status: 'Closed', assignee: null, labels: [] })
   })
 
   it('de-duplicates keys and skips falsy values', async () => {
@@ -163,6 +163,21 @@ describe('fetchIssueStatusesByKeys', () => {
       'TRT-9': { assignee: { displayName: 'Bob' } } // no status field
     })
     const m = await fetchIssueStatusesByKeys(jiraRequest, ['TRT-9'])
-    expect(m.get('TRT-9')).toEqual({ status: 'Unknown', assignee: 'Bob' })
+    expect(m.get('TRT-9')).toEqual({ status: 'Unknown', assignee: 'Bob', labels: [] })
+  })
+})
+
+describe('fetchAgentData', () => {
+  it('excludes Chai-driven backports from the Jira Solve query', async () => {
+    let requestedJql = ''
+    const jiraRequest = async (path) => {
+      requestedJql = new URL('https://x' + path).searchParams.get('jql')
+      return { issues: [], isLast: true }
+    }
+
+    await fetchAgentData(jiraRequest)
+
+    expect(requestedJql).toContain('labels = "issue-for-agent"')
+    expect(requestedJql).toContain('labels != "chai-backport"')
   })
 })

@@ -21,7 +21,8 @@ const fetcher = {
   fetchAgentData: vi.fn(),
   fetchIssueStatusesByKeys: vi.fn(),
   computeMetrics: vi.fn(),
-  dedupeAgentWork: vi.fn()
+  dedupeAgentWork: vi.fn(),
+  CHAI_BACKPORT_LABEL: 'chai-backport'
 }
 const prsModule = {
   fetchAgentPrs: vi.fn(),
@@ -164,6 +165,40 @@ describe('runRefresh linked PRs via Jira remote links', () => {
 });
 
 describe('runRefresh chai-bot PR accounting', () => {
+  it('discards a bot PR whose Jira issue is a Chai-driven backport', async () => {
+    fetcher.fetchAgentData.mockResolvedValue([]);
+    const backportPr = {
+      repo: 'openshift/origin', team: 'trt', number: 8,
+      url: 'https://github.com/openshift/origin/pull/8',
+      title: '[release-4.20] OCPBUGS-99: fix', state: 'OPEN', jiraKey: 'OCPBUGS-99'
+    };
+    prsModule.fetchAgentPrs.mockResolvedValue([backportPr]);
+    fetcher.fetchIssueStatusesByKeys.mockResolvedValue(new Map([
+      ['OCPBUGS-99', { status: 'POST', assignee: null, labels: ['chai-backport'] }]
+    ]));
+
+    const { store, runRefresh } = setup();
+    await runRefresh();
+
+    expect(fetcher.dedupeAgentWork).toHaveBeenCalledWith([], []);
+    expect(store['jira-solve-agent/data.json'].issues).toEqual([]);
+    expect(store['jira-solve-agent/data.json'].prs).toEqual([]);
+  });
+
+  it('fails closed for keyed bot PRs when Jira classification fails', async () => {
+    fetcher.fetchAgentData.mockResolvedValue([]);
+    const keyedPr = { repo: 'openshift/origin', number: 9, url: 'keyed', jiraKey: 'OCPBUGS-100' };
+    const keylessPr = { repo: 'openshift/origin', number: 10, url: 'keyless', jiraKey: null };
+    prsModule.fetchAgentPrs.mockResolvedValue([keyedPr, keylessPr]);
+    fetcher.fetchIssueStatusesByKeys.mockRejectedValue(new Error('Jira unavailable'));
+
+    const { store, runRefresh } = setup();
+    await runRefresh();
+
+    expect(fetcher.dedupeAgentWork).toHaveBeenCalledWith([], [keylessPr]);
+    expect(store['jira-solve-agent/data.json'].prs).toEqual([keylessPr]);
+  });
+
   it('adds a net-new keyed PR as its own counted row', async () => {
     fetcher.fetchAgentData.mockResolvedValue([{ key: 'CNTRLPLANE-507', status: 'Closed', agentState: 'closed' }]);
     const botPrs = [
@@ -175,13 +210,13 @@ describe('runRefresh chai-bot PR accounting', () => {
       combined: { jiraIssues: 1, prsCounted: 1, prsOverlap: 0, netNewKeyed: 1, noKey: 0, total: 2 }
     });
     fetcher.fetchIssueStatusesByKeys.mockResolvedValue(new Map([
-      ['MCO-999', { status: 'In Progress', assignee: 'Ada' }]
+      ['MCO-999', { status: 'In Progress', assignee: 'Ada', labels: [] }]
     ]));
     remoteLinksModule.fetchLinkedPrsForKeys.mockResolvedValue(new Map([
       ['MCO-999', [{ repo: 'openshift/machine-config-operator', team: 'mco', number: 99, url: 'https://github.com/openshift/machine-config-operator/pull/99', state: 'OPEN', author: null }]]
     ]));
 
-    const { store, runRefresh } = setup({ token: '' });
+    const { store, runRefresh } = setup();
     await runRefresh();
 
     const saved = store['jira-solve-agent/data.json'];

@@ -24,7 +24,7 @@ describe('LandingPage', () => {
     expect(wrapper.text()).toContain('Agentic Team, Engineer & Repo Structure')
     expect(wrapper.text()).toContain('Refinement Assistance')
     expect(wrapper.text()).toContain('ValorFlow')
-    expect(wrapper.findAll('span').filter(span => span.text() === 'TBD')).toHaveLength(1)
+    expect(wrapper.findAll('span').filter(span => span.text() === 'TBD')).toHaveLength(0)
     const titles = wrapper.findAll('#strategic-initiatives-heading + div h2').map(title => title.text())
     expect(titles).toEqual([
       'Agentic Team, Engineer & Repo Structure',
@@ -56,6 +56,15 @@ describe('LandingPage', () => {
     await initiative.trigger('click')
 
     expect(wrapper.emitted('navigate')).toContainEqual(['cve-triage'])
+  })
+
+  it('navigates from Agentic Backports to its tracker', async () => {
+    const wrapper = mountPage()
+    const initiative = wrapper.findAll('button').find(button => button.text().includes('validating release backports'))
+
+    await initiative.trigger('click')
+
+    expect(wrapper.emitted('navigate')).toContainEqual(['backport-tracker'])
   })
 
   it('navigates from team structure to Team Tracker home', async () => {
