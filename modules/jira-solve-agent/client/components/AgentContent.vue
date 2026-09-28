@@ -304,11 +304,6 @@ const TEAMS = [
       'vcf-migration-operator'
     ]
   },
-  // Test-only placeholder — no components or prefixes, so it never matches
-  // real issues.  Lets tests exercise the no-repos tooltip path with a
-  // synthetic team name instead of relying on a real team that may gain or
-  // lose repos over time.
-  { key: 'lorem-ipsum', label: 'Lorem Ipsum', components: [] },
 ];
 
 // Table columns, in render order. Each `key` matches a SORTERS entry, so the
