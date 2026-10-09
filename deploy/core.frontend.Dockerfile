@@ -34,7 +34,7 @@ COPY modules/backport-tracker/ ./modules/backport-tracker/
 RUN npm run build
 
 # Stage 3: Serve with Red Hat Hardened nginx (distroless)
-FROM registry.access.redhat.com/hi/nginx:1.30.5@sha256:d35cbf4710c857ab7488914c8ab98c0d02ea954f225f928bfb1f708542605200
+FROM registry.access.redhat.com/hi/nginx:1.30.5@sha256:7c88ec5f1177a2ab937e3fb99c3e42c367c629a7632e5c90a9dc607a9e4d1dcc
 
 COPY deploy/nginx-default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
