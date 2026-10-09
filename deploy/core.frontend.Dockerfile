@@ -5,7 +5,7 @@
 # core.frontend-builder.Dockerfile + core.frontend-runtime.Dockerfile instead.
 
 # Stage 1: Build the Vue SPA
-FROM registry.access.redhat.com/ubi9/nodejs-22-minimal:9.8-1785287245@sha256:22478b029a3723d240fb7a7751e0d5e9655c54352e9f9f55206d060786839143 AS core-build
+FROM registry.access.redhat.com/ubi9/nodejs-22-minimal:9.8-1791441974@sha256:03b7dd64cafaaca5019c4cc1c36e05140b1650dab6cd5c4ab1fde9d88c0537ca AS core-build
 
 USER 0
 
