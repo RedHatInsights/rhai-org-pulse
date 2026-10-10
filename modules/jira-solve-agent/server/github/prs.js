@@ -1,6 +1,7 @@
 /**
  * Fetch pull requests opened by the Jira Solve Agent bot (redhat-chai-bot)
- * across the OpenShift repositories wired up to the periodic agent jobs.
+ * across the repositories wired up to the periodic agent jobs (mostly
+ * openshift/, plus other orgs teams track explicitly, e.g. migtools/).
  *
  * The GitHub GraphQL `search` API is used with a per-repo `author:` filter so
  * we count every PR the bot has ever opened (all states). Each PR's leading
@@ -56,6 +57,10 @@ const TEAM_REPOS = {
     'cluster-authentication-operator',
     'ocp-release-operator-sdk'
   ],
+  // Source of truth for OADP's repo set: oadp-rebasebot/oadp-rebase repos.yaml
+  // (branch oadp-dev), plus the oadp-rebasebot org itself (rebase tooling).
+  // Bare names live under the openshift/ org; migtools/ and oadp-rebasebot/
+  // entries carry their org because the team spans multiple organizations.
   oadp: [
     'oadp-operator',
     'velero',
@@ -63,8 +68,22 @@ const TEAM_REPOS = {
     'velero-plugin-for-gcp',
     'velero-plugin-for-microsoft-azure',
     'velero-plugin-for-legacy-aws',
+    'velero-plugin-for-csi',
     'openshift-velero-plugin',
-    'oadp-must-gather'
+    'oadp-must-gather',
+    'restic',
+    'hypershift-oadp-plugin',
+    'migtools/kopia',
+    'migtools/filebrowser',
+    'migtools/udistribution',
+    'migtools/oadp-vmdp',
+    'migtools/kubevirt-velero-plugin',
+    'migtools/oadp-non-admin',
+    'migtools/kubevirt-datamover-controller',
+    'migtools/kubevirt-datamover-plugin',
+    'migtools/oadp-vm-file-restore',
+    'migtools/oadp-cli',
+    'oadp-rebasebot/oadp-rebase'
   ],
   networking: ['ovn-kubernetes', 'cluster-network-operator', 'multus-cni', 'ptp-operator'],
   etcd: ['etcd', 'cluster-etcd-operator'],
@@ -102,7 +121,8 @@ const TEAM_REPOS = {
   // Repos already wired to another team (oc-mirror→cluster-lifecycle,
   // installer→installer, hypershift→hypershift, etc.) are intentionally excluded.
   // Non-openshift/ orgs (openshift-eng, openshift-metal3, okd-project) are excluded
-  // because the bot only targets openshift/ repositories.
+  // because the bot has no activity there; orgs where it does (like oadp's
+  // migtools/) are listed explicitly in that team's entry.
   'edge-ecosystem': [
     // Edge
     'lvm-operator', 'microshift',
@@ -123,8 +143,10 @@ const TEAM_REPOS = {
   ]
 };
 
+// Bare names are openshift/ repos; entries that already contain a slash name
+// their own org (e.g. migtools/kopia) and are used verbatim.
 const REPO_TEAMS = Object.entries(TEAM_REPOS).flatMap(([team, repos]) =>
-  repos.map(name => ({ repo: `openshift/${name}`, team }))
+  repos.map(name => ({ repo: name.includes('/') ? name : `openshift/${name}`, team }))
 );
 
 // Leading Jira key in a PR title. Excludes CVE- (not a Jira project).
