@@ -56,8 +56,9 @@ describe('REPO_TEAMS', () => {
     expect(REPO_TEAM_BY_NAME['openshift/cincinnati-graph-data']).toBe('ota')
   })
 
-  it('tracks every OADP repo from the rebase bot repos.yaml', () => {
-    // Mirrors oadp-rebasebot/oadp-rebase repos.yaml (branch oadp-dev).
+  it('tracks every OADP repo from the rebase bot repos.yaml plus the rebasebot org', () => {
+    // Mirrors oadp-rebasebot/oadp-rebase repos.yaml (branch oadp-dev) and the
+    // oadp-rebasebot org's own repos (rebase tooling).
     for (const repo of [
       'openshift/oadp-operator', 'openshift/velero',
       'openshift/velero-plugin-for-aws', 'openshift/velero-plugin-for-gcp',
@@ -70,11 +71,12 @@ describe('REPO_TEAMS', () => {
       'migtools/oadp-vmdp', 'migtools/kubevirt-velero-plugin',
       'migtools/oadp-non-admin', 'migtools/kubevirt-datamover-controller',
       'migtools/kubevirt-datamover-plugin', 'migtools/oadp-vm-file-restore',
-      'migtools/oadp-cli'
+      'migtools/oadp-cli',
+      'oadp-rebasebot/oadp-rebase'
     ]) {
       expect(REPO_TEAM_BY_NAME[repo]).toBe('oadp')
     }
-    expect(TEAM_REPOS.oadp).toHaveLength(21)
+    expect(TEAM_REPOS.oadp).toHaveLength(22)
   })
 
   it('wires Edge & Ecosystem repos to edge-ecosystem', () => {

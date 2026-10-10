@@ -58,8 +58,9 @@ const TEAM_REPOS = {
     'ocp-release-operator-sdk'
   ],
   // Source of truth for OADP's repo set: oadp-rebasebot/oadp-rebase repos.yaml
-  // (branch oadp-dev). Bare names live under the openshift/ org; migtools/
-  // entries carry their org because the team spans both organizations.
+  // (branch oadp-dev), plus the oadp-rebasebot org itself (rebase tooling).
+  // Bare names live under the openshift/ org; migtools/ and oadp-rebasebot/
+  // entries carry their org because the team spans multiple organizations.
   oadp: [
     'oadp-operator',
     'velero',
@@ -81,7 +82,8 @@ const TEAM_REPOS = {
     'migtools/kubevirt-datamover-controller',
     'migtools/kubevirt-datamover-plugin',
     'migtools/oadp-vm-file-restore',
-    'migtools/oadp-cli'
+    'migtools/oadp-cli',
+    'oadp-rebasebot/oadp-rebase'
   ],
   networking: ['ovn-kubernetes', 'cluster-network-operator', 'multus-cni', 'ptp-operator'],
   etcd: ['etcd', 'cluster-etcd-operator'],
