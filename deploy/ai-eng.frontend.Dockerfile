@@ -14,6 +14,7 @@ COPY modules/releases/ ./modules/releases/
 COPY modules/upstream-pulse/ ./modules/upstream-pulse/
 COPY modules/product-builds/ ./modules/product-builds/
 COPY modules/system-health/ ./modules/system-health/
+COPY modules/jira-solve-agent/ ./modules/jira-solve-agent/
 
 RUN npm run build
 

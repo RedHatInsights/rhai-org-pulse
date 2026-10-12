@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'modules/**'
+      - 'fixtures/**'
       - 'tests/integration/**'
 
 concurrency:
@@ -56,13 +57,17 @@ jobs:
               - 'modules/releases/client/components/FeatureTable.vue'
               - 'modules/releases/client/components/ClickableCount.vue'
               - 'tests/integration/tv-fv-delta.spec.js'
+            jira-solve-agent:
+              - 'modules/jira-solve-agent/**'
+              - 'fixtures/jira-solve-agent/**'
+              - 'tests/integration/jira-solve-agent.spec.js'
 
       - name: Build module matrix
         id: build-matrix
         run: |
           # If shared test files changed, then test all modules
           if [ "${{ steps.filter.outputs.shared-test-files }}" == "true" ]; then
-            MODULES='["ai-impact", "system-health", "people-teams", "upstream-pulse", "tv-fv-delta"]'
+            MODULES='["ai-impact", "system-health", "people-teams", "upstream-pulse", "tv-fv-delta", "jira-solve-agent"]'
           else
             # Otherwise, use the modules that have direct changes
             MODULES='${{ steps.filter.outputs.changes }}'
