@@ -18,7 +18,7 @@ describe('AppSidebar external agentic tools', () => {
     const wrapper = mountSidebar()
     const readiness = wrapper.find('a[href="https://fleet-insights.apps.engineering.openshift.org/hybrid-platforms/ocp/ai-enablement"]')
     const valorFlow = wrapper.find('a[href="https://valorflow.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com/"]')
-    const hyperShell = wrapper.find('a[href="https://hypershell.apps.rosa.hcmais01ue1.s9m2.p3.openshiftapps.com/"]')
+    const hyperShell = wrapper.find('a[href="https://hypershell.app"]')
 
     expect(readiness.text()).toContain('Agentic Readiness')
     expect(valorFlow.text()).toContain('ValorFlow Refinement')
