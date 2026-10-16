@@ -110,6 +110,7 @@ COPY modules/backport-tracker/ ./modules/backport-tracker/
 COPY fixtures/ai-impact/ ./fixtures/ai-impact/
 COPY fixtures/cve-triage ./fixtures/cve-triage/
 COPY fixtures/backport-tracker/ ./fixtures/backport-tracker/
+COPY fixtures/jira-solve-agent/ ./fixtures/jira-solve-agent/
 
 USER 0
 
