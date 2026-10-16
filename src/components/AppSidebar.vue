@@ -471,7 +471,7 @@ const navSections = computed(() => {
         id: 'hypershell',
         label: 'HyperShell',
         icon: Rocket,
-        href: 'https://hypershell.apps.rosa.hcmais01ue1.s9m2.p3.openshiftapps.com/'
+        href: 'https://hypershell.app'
       }
     ]
   })

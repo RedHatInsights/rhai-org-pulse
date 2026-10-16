@@ -78,7 +78,7 @@ describe('LandingPage', () => {
 
   it('links HyperShell externally', () => {
     const wrapper = mountPage()
-    const link = wrapper.find('a[href="https://hypershell.apps.rosa.hcmais01ue1.s9m2.p3.openshiftapps.com/"]')
+    const link = wrapper.find('a[href="https://hypershell.app"]')
 
     expect(link.text()).toContain('Support long-lived cloud agents secured by OpenShell.')
     expect(link.text()).toContain('External')

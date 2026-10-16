@@ -148,7 +148,7 @@ const strategicInitiatives = [
     title: 'HyperShell',
     description: 'Support long-lived cloud agents secured by OpenShell.',
     icon: Cloud,
-    href: 'https://hypershell.apps.rosa.hcmais01ue1.s9m2.p3.openshiftapps.com/',
+    href: 'https://hypershell.app',
     status: 'External'
   }
 ]
