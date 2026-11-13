@@ -9,7 +9,7 @@
 # Modules are auto-discovered at startup via filesystem scan.
 
 # Stage 1: Install system deps and node_modules
-FROM registry.access.redhat.com/ubi9/nodejs-22-minimal:9.8-1785287245@sha256:22478b029a3723d240fb7a7751e0d5e9655c54352e9f9f55206d060786839143 AS build
+FROM registry.access.redhat.com/ubi9/nodejs-22-minimal:9.9-1794500978@sha256:0cc4ae118138dd07280d5abaa12b6a018e5bc82c048296f3c3676e62d3a1d8a8 AS build
 
 USER 0
 
